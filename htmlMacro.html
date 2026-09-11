@@ -1,0 +1,52 @@
+<!-- ===========================================================
+     Vertretungspool Wochenendpräsenz — HTML-Macro Body (Server 7.4)
+     Schlank & sanitizer-fest halten. ALLE Logik/Styles/DOM erzeugt
+     app.js zur Laufzeit (JS-erzeugtes DOM laeuft NICHT durch
+     Sanitizer/Velocity).
+     app.js + seed.json + (Logo) als ANHAENGE dieser Seite hochladen.
+     =========================================================== -->
+<div id="wp-root"><!-- wird durch app.js befuellt --></div>
+<script type="text/javascript">
+    (function () {
+        /* ADMINS: Confluence-Benutzername (Login-Name aus der Profil-URL
+     /display/~benutzername) oder userKey. Gross-/Kleinschreibung egal.
+     Admin = darf im Detail-Dialog alles aendern (Datum, Eintragsdatum,
+     Dienst von, Beworbene, Vertretung) und Dienste loeschen.
+     Anzeigenamen mit "carsten" am Anfang sind zusaetzlich Admin. */
+        window.WP_ADMINS = ["USERNAME_1", "USERNAME_2"];
+
+        function getPageId() {
+            if (window.AJS) {
+                if (AJS.Meta) {
+                    var v = AJS.Meta.get("page-id");
+                    if (v) {
+                        return v;
+                    }
+                }
+                if (AJS.params) {
+                    if (AJS.params.pageId) {
+                        return AJS.params.pageId;
+                    }
+                }
+            }
+            var m = document.querySelector('meta[name="ajs-page-id"]');
+            if (m) {
+                return m.getAttribute("content");
+            }
+            return "";
+        }
+        function getCtx() {
+            if (window.AJS) {
+                if (AJS.contextPath) {
+                    return AJS.contextPath();
+                }
+            }
+            return "";
+        }
+        var pid = getPageId();
+        var s = document.createElement("script");
+        s.src = getCtx() + "/download/attachments/" + pid + "/app.js";
+        s.async = false;
+        document.body.appendChild(s);
+    })();
+</script>
