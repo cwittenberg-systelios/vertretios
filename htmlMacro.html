@@ -3,7 +3,10 @@
      Schlank & sanitizer-fest halten. ALLE Logik/Styles/DOM erzeugt
      app.js zur Laufzeit (JS-erzeugtes DOM laeuft NICHT durch
      Sanitizer/Velocity).
-     app.js + seed.json + (Logo) als ANHAENGE dieser Seite hochladen.
+     persistence.js + app.js + seed.json + (Logo) als ANHAENGE dieser
+     Seite hochladen (Build-Dateien aus dist/deploy, s. README).
+     Reihenfolge: persistence.js VOR app.js. Cache-Bust ?v=Date.now(),
+     damit nie eine alte, gecachte app.js laeuft.
      =========================================================== -->
 <div id="wp-root"><!-- wird durch app.js befuellt --></div>
 <script type="text/javascript">
@@ -43,10 +46,35 @@
             }
             return "";
         }
+        function fail(msg) {
+            var r = document.getElementById("wp-root");
+            if (r) {
+                r.textContent = msg;
+                r.style.cssText = "background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;border-radius:6px;padding:10px 12px;font:13px sans-serif";
+            }
+        }
         var pid = getPageId();
-        var s = document.createElement("script");
-        s.src = getCtx() + "/download/attachments/" + pid + "/app.js";
-        s.async = false;
-        document.body.appendChild(s);
+        if (!pid) {
+            fail("Seiten-ID nicht gefunden.");
+            return;
+        }
+        var files = ["persistence.js", "app.js"];
+        var bust = Date.now();
+        function next(i) {
+            if (i >= files.length) {
+                return;
+            }
+            var s = document.createElement("script");
+            s.src = getCtx() + "/download/attachments/" + pid + "/" + files[i] + "?v=" + bust;
+            s.async = false;
+            s.onload = function () {
+                next(i + 1);
+            };
+            s.onerror = function () {
+                fail("Fehler beim Laden: " + files[i] + " (Anhang fehlt?)");
+            };
+            document.body.appendChild(s);
+        }
+        next(0);
     })();
 </script>

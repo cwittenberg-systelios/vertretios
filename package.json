@@ -1,0 +1,10 @@
+{
+  "name": "vertretios",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Vertretungspool Wochenendpräsenz – Confluence HTML/JS-App",
+  "scripts": {
+    "test": "node test/run.js",
+    "build": "sh build.sh"
+  }
+}

@@ -1,6 +1,9 @@
-/* Vertretungspool Wochenendpräsenz — app.js (einzige Logikquelle: lokal + Confluence) */
+/* Vertretungspool Wochenendpräsenz — app.js (einzige Logikquelle: lokal + Confluence)
+   Persistenz: persistence.js (muss VOR app.js geladen sein, s. htmlMacro.html). */
 (function(){
   "use strict";var GROUP="Wochenendpräsenz";var userCache={};
+var BUILD_VERSION="__BUILD_VERSION__";if(BUILD_VERSION.indexOf("__")===0)BUILD_VERSION="dev";  // build.sh setzt git describe ein
+if(window.console)console.log("[WP] Vertretungspool Build "+BUILD_VERSION);
 function wpAdmins(){var list=(window.WP_ADMINS&&window.WP_ADMINS.length)?window.WP_ADMINS:[];var out=[];for(var i=0;i<list.length;i++){out.push(String(list[i]).toLowerCase());}return out;}
 function isAdmin(){var m=byId[cur]||null;var uname=String((m&&m.username)||"").toLowerCase();var ukey=String((m&&m.id)||cur||"").toLowerCase();var A=wpAdmins();for(var i=0;i<A.length;i++){if(A[i]&&(A[i]===uname||A[i]===ukey))return true;}return false;}
 function isOwner(r){if(!r)return false;var me=byId[cur]||null;if(r.dienstVonUser){if(r.dienstVonUser===cur)return true;return !!(me&&me.username&&r.dienstVonUser===me.username);}var mn=String((me&&me.name)||"").toLowerCase();return !!(r.dienstVon&&mn&&String(r.dienstVon).toLowerCase()===mn);}
@@ -140,6 +143,17 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
   .admchip:hover{background:var(--soft)}
   .admchip.on{background:var(--okbg);border-color:var(--c-vergeben);color:var(--ok);font-weight:600}
   @media print{ .admbox{display:none!important} }
+  .wp-errbar,.wp-warnbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-radius:var(--r);padding:9px 14px;margin:0 auto 12px;max-width:920px;font-size:13px}
+  .wp-errbar{background:var(--dangerbg);border:1px solid var(--danger);color:var(--danger)}
+  .wp-warnbar{background:var(--amberbg);border:1px solid var(--amber);color:var(--amber)}
+  .wp-errbar .txt,.wp-warnbar .txt{flex:1;min-width:200px}
+  .wp-ro .acts,.wp-ro .iacts,.wp-ro .wp-modal-f,.wp-ro .admbox,.wp-ro #addbtn,.wp-ro #gcard,.wp-ro #cleanbtn,.wp-ro #resetbtn{display:none!important}
+  .wp-foot{color:var(--muted);font-size:11px;text-align:center;margin:8px 0 0}
+  .dstbl{width:100%;border-collapse:collapse;font-size:12px}
+  .dstbl th,.dstbl td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
+  .dstbl tr.cur td{font-weight:600;color:var(--ok)}
+  .dstbl tr.bad td{color:var(--danger)}
+  @media print{ .wp-errbar,.wp-warnbar,.wp-foot{display:none!important} }
 `;var __SHELL=`
   <div class="hint-green">Schnick-Schnack-Schuck um die Wochenendpräsenz! Du weißt nicht, wie man spielt? <a href="#wp-anleitung">Hier zur Spielanleitung.</a></div>
 
@@ -169,7 +183,9 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
   <div class="card noprint"><h2>Aktivität / Protokoll (rot = Override; [STUB] = Teilen-Benachrichtigung)</h2><div class="log" id="log"></div></div>
   <div class="card noprint"><h2>Selbsttest (Engine & Live-Invarianten)</h2><div class="diag" id="diag"></div></div>
   <div class="card noprint" id="selftest2card" style="display:none"><h2>Selbsttest — Unit &amp; Integration</h2><div class="diag" id="selftest2"></div></div>
-  <div class="card guide" id="wp-anleitung"><h2>Anleitung</h2><div class="sum">Trag deinen zu vertretenden Dienst über „+ Gesuch" ein. Als Poolmitglied markierst du bei passenden Terminen „kann"; das System schlägt fair vor, wer als Nächstes dran ist. Mit „zusagen" übernimmst du verbindlich, mit „Nicht ich – weitergeben" reichst du an die/den Nächste(n) weiter. Ganz oben siehst du deine eigenen Gesuche, in der Inbox was für dich zu tun ist, in der Liste den Gesamtüberblick.</div><details><summary>… mehr Details</summary><h4>Worum geht es</h4><p>Die Liste verteilt Vertretungen für Wochenend- und Feiertagsdienste. Du entscheidest immer selbst — das System macht nur faire Vorschläge.</p><h4>Wenn du selbst eine Vertretung suchst</h4><ul><li>Öffne „+ Gesuch", wähle das Datum und trag dich als „Dienst von" ein.</li><li>Im Bereich „Meine Vertretungsgesuche" (ganz oben) siehst du den Status: wie viele Angebote es gibt, ob schon jemand zugesagt hat und ab wann mit einer Zusage zu rechnen ist.</li><li>Brauchst du keine Vertretung mehr: „zurückziehen". Tut sich nichts: „Pool erinnern".</li></ul><h4>Wenn du Dienste übernehmen kannst (Pool)</h4><ul><li>Markiere bei jedem Termin, den du übernehmen könntest, „kann".</li><li>Das System schlägt unter allen, die „kann" markiert haben, die Person mit den wenigsten bisher übernommenen Diensten im laufenden Jahr vor.</li><li>Stehst du im „Vorschlag für dich", kannst du mit „zusagen" verbindlich übernehmen — oder „Nicht ich – weitergeben", dann rückt der Vorschlag zur/zum Nächsten.</li></ul><h4>Gleichstand</h4><p>Haben mehrere gleich wenige Dienste, wird fair zufällig eine Person vorgeschlagen; die anderen werden als „gleichauf" mit genannt, damit ihr euch absprechen könnt, für wen es am besten passt.</p><h4>Inbox und Liste</h4><ul><li><b>Inbox</b>: zeigt personalisiert, was gerade für dich ansteht.</li><li><b>Liste</b>: alle Termine chronologisch mit Status; vergangene sind eingeklappt.</li></ul><h4>Status der Termine</h4><ul><li><b>Sammelphase</b>: Pool kann sich melden (bis ca. 3 Wochen vor dem Termin).</li><li><b>Zusagephase</b>: ab ca. 3 Wochen vorher — jetzt verbindlich zusagbar.</li><li><b>zugesagt</b>: eine Vertretung steht fest.</li><li><b>kritisch</b>: letzte Woche, noch keine Vertretung.</li><li><b>durchgerutscht</b>: vorbei, ohne Vertretung.</li></ul><h4>Fristen (weiche Hinweise)</h4><p>Ablauf je Dienst: Nach dem Eintragen läuft die <b>Sammelphase</b>, in der sich der Pool meldet. Etwa 3 Wochen vor dem Termin beginnt die <b>Zusagephase</b> — erst dann ist eine verbindliche Zusage möglich (vorher zeigt die App „Zusage ab …"). Wird ein Dienst eingetragen, der bereits innerhalb der nächsten 3 Wochen liegt, entfällt die Sammelphase und er kann sofort zugesagt werden.</p><h4>Löschen</h4><p>Falsch eingetragene Dienste lassen sich löschen, solange sie nicht verbindlich zugesagt sind. Zugesagte Dienste sind final und können nicht mehr gelöscht werden (zuerst „freigeben").</p><h4>Jahresübersicht &amp; Export</h4><p>Im Bereich „Jahresübersicht &amp; Export" wählst du ein Jahr und siehst alle Dienste mit Status kompakt in einer Tabelle. „CSV herunterladen" speichert die Übersicht als Datei (öffnet sich in Excel). Am Ende steht eine kleine Statistik: Gesamtzahl, Aufschlüsselung je Status und ein Ranking der Personen nach zugesagten Diensten.</p><h4>Benachrichtigungen</h4><ul><li>Wer einen Dienst eingetragen hat, wird benachrichtigt, sobald jemand zusagt.</li><li>Die zugesagte Vertretung wird einige Tage vor dem Termin erinnert.</li><li>Offene Termine lassen sich per „Pool erinnern" in Erinnerung rufen.</li></ul></details></div>`;function injectStyle(){var s=document.createElement("style");s.textContent=__CSS;document.head.appendChild(s);}function buildShell(){var r=document.getElementById("wp-root");if(!r){r=document.createElement("div");r.id="wp-root";document.body.appendChild(r);}r.innerHTML=__SHELL;}function getPageId(){if(window.AJS){if(AJS.Meta){var v=AJS.Meta.get("page-id");if(v)return v;}if(AJS.params&&AJS.params.pageId)return AJS.params.pageId;}var m=document.querySelector('meta[name="ajs-page-id"]');return m?m.getAttribute("content"):"";}function getCtx(){return (window.AJS&&AJS.contextPath)?AJS.contextPath():"";}var PID=getPageId(),CTX=getCtx(),IS_CONF=!!PID,__members=null,curName=null;function showError(e){var msg=(e&&e.message)?e.message:String(e);if(window.console)console.error("[WP]",e);var host=document.getElementById("wp-root")||document.body;var b=document.getElementById("wp-err");if(!b){b=document.createElement("div");b.id="wp-err";b.style.cssText="background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif";host.insertBefore(b,host.firstChild);}b.textContent="Fehler: "+msg+" (403=Rechte,404=Pfad,409=Version,413=zu groß)";}function showInfo(d){var host=document.getElementById("wp-root")||document.body;var b=document.createElement("div");b.style.cssText="background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;color:#1f5132";var msg="Erst-Import aus seed.json: "+d.members+" Mitglieder aus Gruppe \""+GROUP+"\", "+d.bestMapped+"/"+d.bestSeed+" Zusagen uebernommen, "+d.kannMapped+"/"+d.kannSeed+" kann uebernommen.";if(d.bestSeed===0){msg+=" ACHTUNG: seed.json enthaelt keine Zusagen - vermutlich veralteter Anhang.";}else if(d.bestMapped===0){msg+=" ACHTUNG: keine Zusage zugeordnet - Namen passen nicht zur Gruppe.";}if(d.unmapped&&d.unmapped.length){msg+=" Nicht zugeordnet: "+d.unmapped.join(", ")+".";}b.textContent=msg;host.insertBefore(b,host.firstChild);}function jget(p){return fetch(CTX+p,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("GET "+p+" -> "+r.status);return r.json();});}function share(p){return fetch(CTX+"/rest/share-page/latest/share",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(p)}).then(function(r){if(!r.ok)throw new Error("share-page -> "+r.status);return true;});}function shareUsers(u,note){return share({users:u,emails:[],groups:[],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function shareGroup(g,note){return share({users:[],emails:[],groups:[g],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  <div class="card noprint" id="dscard" style="display:none"><h2>Datenstände (Admin)</h2><div class="muted">Gespeicherte Generationen (die letzten 10 bleiben als Historie). Ein älterer Stand wird als <b>neue</b> Generation wiederhergestellt; nichts wird gelöscht.</div><div class="bar" style="margin:8px 0"><button class="btn sm" id="dsload">Datenstände anzeigen</button></div><div id="dslist"></div></div>
+  <div class="card guide" id="wp-anleitung"><h2>Anleitung</h2><div class="sum">Trag deinen zu vertretenden Dienst über „+ Gesuch" ein. Als Poolmitglied markierst du bei passenden Terminen „kann"; das System schlägt fair vor, wer als Nächstes dran ist. Mit „zusagen" übernimmst du verbindlich, mit „Nicht ich – weitergeben" reichst du an die/den Nächste(n) weiter. Ganz oben siehst du deine eigenen Gesuche, in der Inbox was für dich zu tun ist, in der Liste den Gesamtüberblick.</div><details><summary>… mehr Details</summary><h4>Worum geht es</h4><p>Die Liste verteilt Vertretungen für Wochenend- und Feiertagsdienste. Du entscheidest immer selbst — das System macht nur faire Vorschläge.</p><h4>Wenn du selbst eine Vertretung suchst</h4><ul><li>Öffne „+ Gesuch", wähle das Datum und trag dich als „Dienst von" ein.</li><li>Im Bereich „Meine Vertretungsgesuche" (ganz oben) siehst du den Status: wie viele Angebote es gibt, ob schon jemand zugesagt hat und ab wann mit einer Zusage zu rechnen ist.</li><li>Brauchst du keine Vertretung mehr: „zurückziehen". Tut sich nichts: „Pool erinnern".</li></ul><h4>Wenn du Dienste übernehmen kannst (Pool)</h4><ul><li>Markiere bei jedem Termin, den du übernehmen könntest, „kann".</li><li>Das System schlägt unter allen, die „kann" markiert haben, die Person mit den wenigsten bisher übernommenen Diensten im laufenden Jahr vor.</li><li>Stehst du im „Vorschlag für dich", kannst du mit „zusagen" verbindlich übernehmen — oder „Nicht ich – weitergeben", dann rückt der Vorschlag zur/zum Nächsten.</li></ul><h4>Gleichstand</h4><p>Haben mehrere gleich wenige Dienste, wird fair zufällig eine Person vorgeschlagen; die anderen werden als „gleichauf" mit genannt, damit ihr euch absprechen könnt, für wen es am besten passt.</p><h4>Inbox und Liste</h4><ul><li><b>Inbox</b>: zeigt personalisiert, was gerade für dich ansteht.</li><li><b>Liste</b>: alle Termine chronologisch mit Status; vergangene sind eingeklappt.</li></ul><h4>Status der Termine</h4><ul><li><b>Sammelphase</b>: Pool kann sich melden (bis ca. 3 Wochen vor dem Termin).</li><li><b>Zusagephase</b>: ab ca. 3 Wochen vorher — jetzt verbindlich zusagbar.</li><li><b>zugesagt</b>: eine Vertretung steht fest.</li><li><b>kritisch</b>: letzte Woche, noch keine Vertretung.</li><li><b>durchgerutscht</b>: vorbei, ohne Vertretung.</li></ul><h4>Fristen (weiche Hinweise)</h4><p>Ablauf je Dienst: Nach dem Eintragen läuft die <b>Sammelphase</b>, in der sich der Pool meldet. Etwa 3 Wochen vor dem Termin beginnt die <b>Zusagephase</b> — erst dann ist eine verbindliche Zusage möglich (vorher zeigt die App „Zusage ab …"). Wird ein Dienst eingetragen, der bereits innerhalb der nächsten 3 Wochen liegt, entfällt die Sammelphase und er kann sofort zugesagt werden.</p><h4>Löschen</h4><p>Falsch eingetragene Dienste lassen sich löschen, solange sie nicht verbindlich zugesagt sind. Zugesagte Dienste sind final und können nicht mehr gelöscht werden (zuerst „freigeben").</p><h4>Jahresübersicht &amp; Export</h4><p>Im Bereich „Jahresübersicht &amp; Export" wählst du ein Jahr und siehst alle Dienste mit Status kompakt in einer Tabelle. „CSV herunterladen" speichert die Übersicht als Datei (öffnet sich in Excel). Am Ende steht eine kleine Statistik: Gesamtzahl, Aufschlüsselung je Status und ein Ranking der Personen nach zugesagten Diensten.</p><h4>Benachrichtigungen</h4><ul><li>Wer einen Dienst eingetragen hat, wird benachrichtigt, sobald jemand zusagt.</li><li>Die zugesagte Vertretung wird einige Tage vor dem Termin erinnert.</li><li>Offene Termine lassen sich per „Pool erinnern" in Erinnerung rufen.</li></ul></details></div>
+  <div class="wp-foot" id="wp-foot"></div>`;function injectStyle(){var s=document.createElement("style");s.textContent=__CSS;document.head.appendChild(s);}function buildShell(){var r=document.getElementById("wp-root");if(!r){r=document.createElement("div");r.id="wp-root";document.body.appendChild(r);}r.innerHTML=__SHELL;}function getPageId(){if(window.AJS){if(AJS.Meta){var v=AJS.Meta.get("page-id");if(v)return v;}if(AJS.params&&AJS.params.pageId)return AJS.params.pageId;}var m=document.querySelector('meta[name="ajs-page-id"]');return m?m.getAttribute("content"):"";}function getCtx(){return (window.AJS&&AJS.contextPath)?AJS.contextPath():"";}var PID=getPageId(),CTX=getCtx(),IS_CONF=!!PID,__members=null,curName=null;function showError(e){var msg=(e&&e.message)?e.message:String(e);if(window.console)console.error("[WP]",e);var host=document.getElementById("wp-root")||document.body;var b=document.getElementById("wp-err");if(!b){b=document.createElement("div");b.id="wp-err";b.style.cssText="background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif";host.insertBefore(b,host.firstChild);}b.textContent="Fehler: "+msg+" (403=Rechte,404=Pfad,409=Version,413=zu groß)";}function showInfo(d){var host=document.getElementById("wp-root")||document.body;var b=document.createElement("div");b.style.cssText="background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;color:#1f5132";var msg="Erst-Import aus seed.json: "+d.members+" Mitglieder aus Gruppe \""+GROUP+"\", "+d.bestMapped+"/"+d.bestSeed+" Zusagen uebernommen, "+d.kannMapped+"/"+d.kannSeed+" kann uebernommen.";if(d.bestSeed===0){msg+=" ACHTUNG: seed.json enthaelt keine Zusagen - vermutlich veralteter Anhang.";}else if(d.bestMapped===0){msg+=" ACHTUNG: keine Zusage zugeordnet - Namen passen nicht zur Gruppe.";}if(d.unmapped&&d.unmapped.length){msg+=" Nicht zugeordnet: "+d.unmapped.join(", ")+".";}b.textContent=msg;host.insertBefore(b,host.firstChild);}function jget(p){return fetch(CTX+p,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("GET "+p+" -> "+r.status);return r.json();});}function share(p){return fetch(CTX+"/rest/share-page/latest/share",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(p)}).then(function(r){if(!r.ok)throw new Error("share-page -> "+r.status);return true;});}function shareUsers(u,note){return share({users:u,emails:[],groups:[],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function shareGroup(g,note){return share({users:[],emails:[],groups:[g],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 /* ============================================================
    Sprint 2b — Activity-Stream-Sichtbarkeit ueber unsichtbaren
    Seiten-Marker (Anchor-Makro mit hochzaehlender Nummer).
@@ -199,200 +215,45 @@ function sxJson(method,path,body){var x=new XMLHttpRequest();x.open(method,CTX+p
 // Close-Flush: ausstehenden Bump bei beforeunload/hidden sofort, synchron, Best-Effort (umgeht die Drosselung).
 function flushActivityNow(){if(!IS_CONF||!PID||!_bump.pending||_bump.inflight)return;if(_bump.timer){clearTimeout(_bump.timer);_bump.timer=null;}_bump.pending=false;try{var g=sxJson("GET","/rest/api/content/"+PID+"?expand=body.storage,version,space",null);if(!g||g.status<200||g.status>=300)return;var pg=JSON.parse(g.text);sxJson("PUT","/rest/api/content/"+PID,bumpPut(pg));}catch(e){}}
 function RestStore(){var fn="wpdata.json";function meta(){return jget("/rest/api/content/"+PID+"/child/attachment?filename="+fn+"&expand=version").then(function(d){return (d.results&&d.results[0])||null;});}return {name:"rest",load:function(){return meta().then(function(a){if(!a)return null;return fetch(CTX+"/download/attachments/"+PID+"/"+fn+"?cb="+Date.now(),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("download "+fn+" -> "+r.status);return r.json();});});},save:function(model){var blob=new Blob([JSON.stringify(model)],{type:"application/json"});var fd=new FormData();fd.append("file",blob,fn);fd.append("minorEdit","true");fd.append("comment","auto-save");return meta().then(function(a){var url=a?("/rest/api/content/"+PID+"/child/attachment/"+a.id+"/data"):("/rest/api/content/"+PID+"/child/attachment");return fetch(CTX+url,{method:"POST",credentials:"same-origin",headers:{"X-Atlassian-Token":"no-check"},body:fd}).then(function(r){if(!r.ok)throw new Error("save "+fn+" -> "+r.status);return true;});});},reset:function(){return Promise.resolve();}};}
-/* === Property-Store (gechunkt, Copy-on-Write) — ersetzt RestStore als Persistenz.
-   Content-Properties erscheinen NICHT im Activity-Feed -> rauschfreies Speichern.
-   Der Alt-Anhang bleibt als Backup erhalten und wird nur einmalig migriert. === */
+/* === Property-Store-Adapter — Persistenz liegt in persistence.js (VertretiosPersistence.Store).
+   Port der gehaerteten urlaubios-Persistenz: Copy-on-Write mit Token, Manifest-CAS, Nachlesen bei
+   5xx, Umzug bei Bereichswechsel, Historie (10 Generationen), Admin-Wiederherstellung, Platzhalter
+   gegen alte App-Versionen. Es gibt KEINEN synchronen Speicherpfad mehr (frueher beforeunload). === */
+var OLD_FILES=["wpdata.json","ap-data.json"]; // Alt-Anhaenge als Migrationsquelle (erste vorhandene gewinnt)
+// Alt-Anhang lesen: nicht vorhanden -> null; jeder andere Fehler -> Exception (= Ladefehler, nie "leer").
+function readAttachmentStrict(fn){
+  return fetch(CTX+"/rest/api/content/"+PID+"/child/attachment?filename="+encodeURIComponent(fn)+"&expand=version",{credentials:"same-origin"}).then(function(r){
+    if(r.status===404)return null;if(!r.ok)throw new Error("Anhang-Liste "+fn+" -> "+r.status);
+    return r.json().then(function(d){var a=(d.results&&d.results[0])||null;if(!a)return null;
+      return fetch(CTX+"/download/attachments/"+PID+"/"+encodeURIComponent(fn)+"?cb="+Date.now(),{credentials:"same-origin"}).then(function(r2){
+        if(!r2.ok)throw new Error("Anhang "+fn+" -> "+r2.status);
+        return r2.json().then(function(j){if(!j||typeof j!=="object")throw new Error("Anhang "+fn+" unlesbar");return j;},function(){throw new Error("Anhang "+fn+" ist kein gueltiges JSON");});
+      });
+    });
+  });
+}
+function readOldAttachment(){return OLD_FILES.reduce(function(p,fn){return p.then(function(found){return found?found:readAttachmentStrict(fn);});},Promise.resolve(null));}
 function PropertyStore(){
-  var MKEY="wpstore";            // Manifest-Property: {v,gen,n,count}
-  var SAFE=30000;                // max. serialisierte Zeichen je Chunk (Reserve unter 32768)
-  var CLEAN_SLACK=8;             // Aufraeum-Reserve fuer verwaiste Chunks abgebrochener Saves
-  var OLD_FILES=["wpdata.json","ap-data.json"]; // Alt-Anhaenge als Migrationsquelle (erste mit Daten gewinnt)
-  var state={gen:0,n:0,sfx:null}; // aktive Generation + Chunk-Anzahl + Chunk-Nonce (null = Legacy-Schluesselform)
-  var vers={};                   // key -> bekannte version.number (create-or-update)
-
-  function CKEY(g,i,sfx){return sfx?(MKEY+"-"+g+"-"+sfx+"-"+i):(MKEY+"-"+g+"-"+i);}
-  function purl(key){return "/rest/api/content/"+PID+"/property"+(key?"/"+encodeURIComponent(key):"");}
-  function jhead(ct){var h={"X-Atlassian-Token":"no-check","Accept":"application/json"};if(ct)h["Content-Type"]="application/json";return h;}
-
-  // String greedy so teilen, dass jeder Chunk SERIALISIERT (inkl. Escaping) <= SAFE bleibt.
-  function packString(s){
-    var chunks=[],i=0,n=s.length;
-    while(i<n){
-      var lo=1,hi=Math.min(n-i,SAFE);
-      while(lo<hi){var mid=Math.ceil((lo+hi)/2);if(JSON.stringify(s.substr(i,mid)).length<=SAFE)lo=mid;else hi=mid-1;}
-      chunks.push(s.substr(i,lo));i+=lo;
-    }
-    return chunks.length?chunks:[""];
-  }
-  function chunkVal(cp){var v=cp&&cp.value;if(v&&typeof v.d==="string")return v.d;return typeof v==="string"?v:"";}
-
-  /* ---- async REST (fetch) ---- */
-  function getProp(key){return fetch(CTX+purl(key),{credentials:"same-origin",headers:jhead(false)}).then(function(r){if(r.status===404)return null;if(!r.ok)throw new Error("prop GET "+key+" -> "+r.status);return r.json();});}
-  function setProp(key,value){
-    var known=vers[key];
-    function put(v){return fetch(CTX+purl(key),{method:"PUT",credentials:"same-origin",headers:jhead(true),body:JSON.stringify({value:value,version:{number:v}})}).then(function(r){if(!r.ok)throw new Error("prop PUT "+key+" -> "+r.status);vers[key]=v;return true;});}
-    function recover(){return getProp(key).then(function(p){var v=(p&&p.version&&p.version.number)||0;return put(v+1);});}
-    if(known)return put(known+1).catch(recover);
-    return fetch(CTX+purl(""),{method:"POST",credentials:"same-origin",headers:jhead(true),body:JSON.stringify({key:key,value:value})}).then(function(r){
-      if(r.ok){vers[key]=1;return true;}
-      if(r.status===409||r.status===400)return recover();
-      throw new Error("prop POST "+key+" -> "+r.status);
-    });
-  }
-  function delProp(key){return fetch(CTX+purl(key),{method:"DELETE",credentials:"same-origin",headers:jhead(false)}).then(function(){delete vers[key];return true;}).catch(function(){return true;});}
-  function writeModel(m){
-    var chunks=packString(JSON.stringify(m));
-    var oldGen=state.gen,oldN=state.n,oldSfx=state.sfx,newGen=oldGen+1;
-    var seq=Promise.resolve();
-    chunks.forEach(function(part,i){seq=seq.then(function(){return setProp(CKEY(newGen,i),{d:part});});});
-    seq=seq.then(function(){return setProp(MKEY,{v:2,gen:newGen,n:chunks.length,count:(m&&m.requests?m.requests.length:0)});});
-    return seq.then(function(){
-      state={gen:newGen,n:chunks.length,sfx:null};
-      var dels=[],i;for(i=0;i<oldN+CLEAN_SLACK;i++)dels.push(CKEY(oldGen,i,oldSfx));
-      for(i=chunks.length;i<chunks.length+CLEAN_SLACK;i++)dels.push(CKEY(newGen,i));
-      return Promise.all(dels.map(delProp)).then(function(){return true;});
-    });
-  }
-
-  /* ---- sync REST (XHR) fuer beforeunload/visibilitychange ---- */
-  function sx(method,key,body){var x=new XMLHttpRequest();x.open(method,CTX+purl(key),false);x.setRequestHeader("X-Atlassian-Token","no-check");x.setRequestHeader("Accept","application/json");if(body!=null)x.setRequestHeader("Content-Type","application/json");try{x.send(body!=null?JSON.stringify(body):null);}catch(e){return {status:0,text:""};}return {status:x.status,text:x.responseText};}
-  function sxPost(key,value){var x=new XMLHttpRequest();x.open("POST",CTX+purl(""),false);x.setRequestHeader("X-Atlassian-Token","no-check");x.setRequestHeader("Accept","application/json");x.setRequestHeader("Content-Type","application/json");try{x.send(JSON.stringify({key:key,value:value}));}catch(e){return {status:0};}return {status:x.status};}
-  function setPropSync(key,value){
-    function putV(v){var r=sx("PUT",key,{value:value,version:{number:v}});if(r.status>=200&&r.status<300){vers[key]=v;return true;}return false;}
-    function refetchPut(){var g=sx("GET",key,null);var v=0;try{v=(JSON.parse(g.text).version.number)||0;}catch(e){}putV(v+1);}
-    var known=vers[key];
-    if(known){if(!putV(known+1))refetchPut();return;}
-    var p=sxPost(key,value);if(p.status>=200&&p.status<300){vers[key]=1;return;}
-    refetchPut();
-  }
-  function delPropSync(key){sx("DELETE",key,null);delete vers[key];}
-  function writeModelSync(m){
-    var chunks=packString(JSON.stringify(m));
-    var oldGen=state.gen,oldN=state.n,oldSfx=state.sfx,newGen=oldGen+1,i;
-    for(i=0;i<chunks.length;i++)setPropSync(CKEY(newGen,i),{d:chunks[i]});
-    setPropSync(MKEY,{v:2,gen:newGen,n:chunks.length,count:(m&&m.requests?m.requests.length:0)});
-    state={gen:newGen,n:chunks.length,sfx:null};
-    for(i=0;i<oldN+CLEAN_SLACK;i++)delPropSync(CKEY(oldGen,i,oldSfx));
-    for(i=chunks.length;i<chunks.length+CLEAN_SLACK;i++)delPropSync(CKEY(newGen,i));
-  }
-
-  /* ---- Migration vom Alt-Anhang (einmalig, idempotent) ---- */
-  function readAttachment(fn){
-    return jget("/rest/api/content/"+PID+"/child/attachment?filename="+encodeURIComponent(fn)+"&expand=version").then(function(d){
-      var a=(d.results&&d.results[0])||null;if(!a)return null;
-      return fetch(CTX+"/download/attachments/"+PID+"/"+encodeURIComponent(fn)+"?cb="+Date.now(),{credentials:"same-origin"}).then(function(r){if(!r.ok)return null;return r.json();});
-    }).catch(function(){return null;});
-  }
-  function readOldAttachment(){return OLD_FILES.reduce(function(p,fn){return p.then(function(found){return found?found:readAttachment(fn);});},Promise.resolve(null));}
-  function migrate(){return readOldAttachment().then(function(data){if(data&&typeof data==="object")return writeModel(data).then(function(){return data;});return null;});}
-
-  /* ============================================================
-     Nebenlaeufigkeit (siehe confluence-property-macro-concurrency.md)
-     Versions-Primitiv im gechunkten Store: Manifest-Generation `gen`
-     (monoton) + Manifest-Property-Version als optimistisches Schloss.
-     ============================================================ */
-
-  // Chunk NUR anlegen (kein Overwrite): kollidiert die Generation mit einem
-  // fremden In-Flight-Save, markiert 409/400 den Konflikt statt zu ueberschreiben.
-  function setChunkNew(key,value){
-    return fetch(CTX+purl(""),{method:"POST",credentials:"same-origin",headers:jhead(true),body:JSON.stringify({key:key,value:value})}).then(function(r){
-      if(r.ok){vers[key]=1;return true;}
-      if(r.status===409||r.status===400){var e=new Error("collision "+key);e.conflict=true;throw e;}
-      throw new Error("prop POST "+key+" -> "+r.status);
-    });
-  }
-  // Compare-and-Swap auf dem Manifest: KEIN stilles recover() -> 409 = echter Konflikt.
-  function casManifest(value,baseVer){
-    if(baseVer){
-      return fetch(CTX+purl(MKEY),{method:"PUT",credentials:"same-origin",headers:jhead(true),body:JSON.stringify({value:value,version:{number:baseVer+1}})}).then(function(r){
-        if(r.ok){vers[MKEY]=baseVer+1;return true;}
-        if(r.status===409){var e=new Error("manifest 409");e.conflict=true;throw e;}
-        throw new Error("manifest PUT -> "+r.status);
-      });
-    }
-    return fetch(CTX+purl(""),{method:"POST",credentials:"same-origin",headers:jhead(true),body:JSON.stringify({key:MKEY,value:value})}).then(function(r){
-      if(r.ok){vers[MKEY]=1;return true;}
-      if(r.status===409||r.status===400){var e=new Error("manifest exists");e.conflict=true;throw e;}
-      throw new Error("manifest POST -> "+r.status);
-    });
-  }
-  function cleanupGen(gen,count,sfx){var dels=[],i;for(i=0;i<count+CLEAN_SLACK;i++)dels.push(CKEY(gen,i,sfx));return Promise.all(dels.map(delProp));}
-
-  // Liest Manifest + Chunks OHNE Seiteneffekt auf state/vers[MKEY] (Rollback bleibt korrekt).
-  function loadFresh(){
-    return getProp(MKEY).then(function(p){
-      if(!p)return {model:null,gen:0,n:0,ver:0,sfx:null};
-      var man=p.value;if(typeof man==="string"){try{man=JSON.parse(man);}catch(e){man=null;}}
-      var ver=(p.version&&p.version.number)||0;
-      var sfx=(man&&man.sfx)||null;
-      if(!man||man.v!==2||!man.n)return {model:null,gen:(man&&man.gen)||0,n:(man&&man.n)||0,ver:ver,sfx:sfx};
-      var idx=[],i;for(i=0;i<man.n;i++)idx.push(i);
-      return Promise.all(idx.map(function(i){return getProp(CKEY(man.gen,i,sfx)).then(function(cp){if(!cp)throw new Error("Chunk fehlt: "+CKEY(man.gen,i,sfx));return chunkVal(cp);});})).then(function(parts){return {model:JSON.parse(parts.join("")),gen:man.gen,n:man.n,ver:ver,sfx:sfx};});
-    });
-  }
-
-  // Optimistisches Speichern mit granularem Konflikt-Replay.
-  // Happy Path: neue Generation schreiben + Manifest-CAS. Bei Konflikt
-  // (Chunk-Kollision ODER Manifest-409): frischen Stand holen, eigenes Delta
-  // via replay(base) neu anwenden, an hoeherer Generation erneut speichern.
-  // Resolved mit dem TATSAECHLICH persistierten (ggf. zusammengefuehrten) Modell.
-  function newSfx(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
-  function saveMerge(localModel,replay){
-    function attempt(m,baseGen,baseN,baseVer,baseSfx,tries){
-      var newGen=baseGen+1;
-      var sfx=newSfx();                                   // pro Versuch eindeutige Chunk-Nonce -> keine Kollision zwischen Tabs
-      var chunks=packString(JSON.stringify(m));
-      var seq=Promise.resolve();
-      chunks.forEach(function(part,i){seq=seq.then(function(){return setChunkNew(CKEY(newGen,i,sfx),{d:part});});});
-      return seq.then(function(){
-        return casManifest({v:2,gen:newGen,n:chunks.length,count:(m&&m.requests?m.requests.length:0),sfx:sfx},baseVer);
-      }).then(function(){
-        state={gen:newGen,n:chunks.length,sfx:sfx};
-        // Basis-Chunks (mit ihrer eigenen Nonce) + eigener Slack aufraeumen
-        var dels=[],i;for(i=0;i<baseN+CLEAN_SLACK;i++)dels.push(CKEY(baseGen,i,baseSfx));
-        for(i=chunks.length;i<chunks.length+CLEAN_SLACK;i++)dels.push(CKEY(newGen,i,sfx));
-        return Promise.all(dels.map(delProp)).then(function(){return m;});
-      }).catch(function(err){
-        if(err&&err.conflict&&tries<3){
-          // nur die EIGENEN gerade geschriebenen Chunks entfernen (Gewinner-Chunks bleiben unberuehrt),
-          // dann frischen Stand holen, eigenes Delta neu anwenden, an hoeherer Generation erneut speichern.
-          return cleanupGen(newGen,chunks.length,sfx).then(loadFresh).then(function(fr){
-            var merged=replay?replay(fr.model||{version:m&&m.version,config:{},requests:[]}):m;
-            return attempt(merged,fr.gen,fr.n,fr.ver,fr.sfx,tries+1);
-          });
-        }
-        throw err;
-      });
-    }
-    return attempt(localModel,state.gen,state.n,vers[MKEY]||0,state.sfx,0);
-  }
-
-  // Guenstiger Poll: nur Manifest lesen, Generation zurueckgeben (Baustein 1).
-  function peekServerGen(){
-    return getProp(MKEY).then(function(p){
-      if(!p)return 0;
-      var man=p.value;if(typeof man==="string"){try{man=JSON.parse(man);}catch(e){man=null;}}
-      return (man&&man.gen)||0;
-    }).catch(function(){return state.gen;});
-  }
-
+  var P=window.VertretiosPersistence;
+  if(!P||!P.Store)throw new Error("persistence.js fehlt oder wurde nicht geladen (Anhang pruefen, Seite neu laden).");
+  var st=new P.Store(new P.ConfluenceTransport(PID,CTX),{fallbackSource:readOldAttachment});
+  function cp(m){return m==null?m:JSON.parse(JSON.stringify(m));}
   return {
-    saveMerge:function(m,replay){return saveMerge(m,replay);},
-    peekServerGen:peekServerGen,
-    currentGen:function(){return state.gen;},
-    name:"property",
-    load:function(){
-      return getProp(MKEY).then(function(p){
-        var man=p&&p.value;if(typeof man==="string"){try{man=JSON.parse(man);}catch(e){man=null;}}
-        if(!p||!man||man.v!==2)return migrate();
-        vers[MKEY]=(p.version&&p.version.number)||1;state={gen:man.gen,n:man.n,sfx:(man.sfx||null)};
-        if(!man.n)return null;
-        var idx=[],i;for(i=0;i<man.n;i++)idx.push(i);
-        return Promise.all(idx.map(function(i){var key=CKEY(man.gen,i,state.sfx);return getProp(key).then(function(cp){if(!cp)throw new Error("Chunk fehlt: "+key);vers[key]=(cp.version&&cp.version.number)||1;return chunkVal(cp);});})).then(function(parts){return JSON.parse(parts.join(""));});
-      });
-    },
-    save:function(m){return writeModel(m);},
-    saveSync:function(m){try{writeModelSync(m);}catch(e){if(window.console)console.warn("[WP] saveSync:",e);}},
+    name:"property",store:st,
+    // -> Modell | null (nur wenn wirklich keine Daten: kein Manifest und kein Alt-Anhang -> Erst-Import).
+    // Ladefehler -> reject (nie leeres Modell als Ersatz).
+    load:function(){return st.load().then(function(m){return st.source==="none"?null:cp(m);});},
+    // Delta-Merge-Speichern: baseGen = Generation, auf der das lokale Modell beruht.
+    saveMerge:function(m,replay,baseGen){return st.saveMerge(m,replay,baseGen);},
+    // Erst-Import (Seed/Version-Stempel): ueberschreibt NIE vorhandene Daten anderer.
+    save:function(m){return st.saveMerge(m,P.replayInitial(m),st.gen);},
+    peekServerGen:function(){return st.peekGen().catch(function(){return st.gen;});},
+    currentGen:function(){return st.gen;},
+    isReadOnly:function(){return !!st.readOnly;},
+    recovered:function(){return st.recovered;},
+    info:function(){return {gen:st.gen,key:st.manifestKey,source:st.source};},
+    describe:function(){return st.describeSets();},
+    restore:function(row){return st.restoreFrom(row.layout,row.gen,row.token,row.count);},
     reset:function(){return Promise.resolve();}
   };
 }
@@ -427,7 +288,33 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   var act=[];
   function log(msg,over){act.unshift({t:new Date().toLocaleTimeString(),m:msg,o:!!over});if(act.length>50)act.pop();}
   var _saveTimer=null,_dirty=false,_lastSaved=null,_saving=false,_pendingSave=false,_polling=false,_pollTimer=null;
-  function onSaveErr(e){showError(e);}
+  var _baseGen=0;        // Server-Generation, auf der _lastSaved beruht (Basis fuer Delta-Merge)
+  var _saveError=null;   // letzter Speicherfehler -> rotes Banner mit "Erneut versuchen"
+  var _loadError=null;   // Ladefehler -> rotes Banner, App schreibgeschuetzt
+  function onSaveErr(e){_saveError=e||new Error("Speichern fehlgeschlagen");if(window.console)console.error("[WP] Speichern:",e);renderStatus();}
+  function isReadOnly(){return !!_loadError||!!(storage&&storage.isReadOnly&&storage.isReadOnly());}
+  function syncBaseGen(){if(storage&&storage.currentGen)_baseGen=storage.currentGen();}
+  /* --- Status-Banner (Lade-/Speicherfehler, Rueckfall-Stand) + Fuss mit Build-Version --- */
+  function renderStatus(){
+    var host=document.getElementById("wp-root")||document.body;
+    var el=document.getElementById("wp-status");
+    if(!el){el=document.createElement("div");el.id="wp-status";host.insertBefore(el,host.firstChild);}
+    var html="",rec=storage&&storage.recovered&&storage.recovered();
+    if(_loadError){
+      html+='<div class="wp-errbar" id="wp-loaderr"><span class="txt"><b>Daten konnten nicht geladen werden.</b> '+esc(_loadError.message||String(_loadError))+'<br>Die App ist schreibgesch\u00fctzt \u2013 es wird nichts gespeichert. Bitte Seite neu laden; bleibt der Fehler, Administrator:in informieren.</span><button type="button" class="btn sm" data-status-act="reload">Seite neu laden</button></div>';
+    }else if(rec){
+      html+='<div class="wp-warnbar" id="wp-recbar"><span class="txt"><b>\u00c4lterer Datenstand angezeigt (schreibgesch\u00fctzt).</b> Der zuletzt gespeicherte Stand (Generation '+esc(rec.manifestGen)+') ist nicht lesbar: '+esc(rec.cause)+' Angezeigt wird Generation '+esc(rec.fromGen)+'. Speichern ist gesperrt, bis eine Administrator:in unter \u201eDatenst\u00e4nde (Admin)\u201c bewusst wiederherstellt.</span></div>';
+    }
+    if(!_loadError&&_saveError){
+      html+='<div class="wp-errbar" id="wp-saveerr"><span class="txt"><b>Nicht gespeichert.</b> '+esc(_saveError.message||String(_saveError))+(_dirty?' \u00b7 Deine \u00c4nderungen sind noch offen.':'')+'</span><button type="button" class="btn sm" data-status-act="retry">Erneut versuchen</button></div>';
+    }
+    el.innerHTML=html;
+    var b=el.querySelectorAll("[data-status-act]");
+    for(var i=0;i<b.length;i++){b[i].onclick=function(){var a=this.getAttribute("data-status-act");if(a==="reload"){location.reload();return;}this.disabled=true;_dirty=true;doSaveCore();};}
+    host.classList.toggle("wp-ro",isReadOnly());
+    var f=document.getElementById("wp-foot");
+    if(f){var inf=(storage&&storage.info)?storage.info():null;f.textContent="Build "+BUILD_VERSION+(inf&&inf.gen?" \u00b7 Datenstand Generation "+inf.gen+(inf.key?" ("+inf.key+")":""):"")+(isReadOnly()?" \u00b7 schreibgesch\u00fctzt":"");}
+  }
   function setStatus(msg,isErr){if(isErr){showError(new Error(msg));}else{log(msg);}}
 
   /* --- Baustein 2: base->local Delta als Replay-Funktion ------------------
@@ -465,12 +352,12 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     var curStr=JSON.stringify(model);
     if(curStr===sentStr){
       if(JSON.stringify(merged)!==curStr){model=merged;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});render();}
-      _lastSaved=JSON.stringify(model);
+      _lastSaved=JSON.stringify(model);syncBaseGen();
     }else{
       var fin=buildReplay(JSON.parse(sentStr),JSON.parse(curStr))(merged);
       if(IS_CONF&&__members)fin.members=__members;
       model=fin;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});render();
-      _lastSaved=JSON.stringify(merged);_dirty=true; // Folge-Save bringt die Zwischen-Edits raus
+      _lastSaved=JSON.stringify(merged);syncBaseGen();_dirty=true; // Folge-Save bringt die Zwischen-Edits raus
     }
     hideUpdateBanner();
   }
@@ -479,6 +366,12 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     if(_saving){_pendingSave=true;return Promise.resolve();}
     if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}
     if(!_dirty)return Promise.resolve();
+    if(isReadOnly()){
+      // Schreibgeschuetzt (Ladefehler/Rueckfall): lokale Aenderung verwerfen, nie speichern.
+      _dirty=false;if(_lastSaved){try{model=JSON.parse(_lastSaved);byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});}catch(e){}}
+      _saveError=new Error("Schreibgesch\u00fctzt \u2013 die Daten konnten nicht vollst\u00e4ndig geladen werden. \u00c4nderung wurde nicht gespeichert.");
+      render();return Promise.resolve();
+    }
     var js=JSON.stringify(model);
     if(js===_lastSaved){_dirty=false;return Promise.resolve();}
     _dirty=false;
@@ -486,13 +379,19 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
       _saving=true;
       var base=null;if(_lastSaved){try{base=JSON.parse(_lastSaved);}catch(e){base=null;}}
       var local=JSON.parse(js),sentStr=js,replay=buildReplay(base,local);
-      return storage.saveMerge(local,replay).then(function(m){adoptMerged(m,sentStr);}).catch(function(e){_lastSaved=null;_dirty=true;onSaveErr(e);}).then(function(){_saving=false;if(_pendingSave||_dirty){_pendingSave=false;persist();}});
+      // Basis-Generation mitgeben: nach Fehlern/Konflikten wird das Delta auf den FRISCHEN Stand gelegt.
+      // _lastSaved bleibt bei Fehlern die Basis -> "Erneut versuchen" wiederholt genau dieses Delta.
+      return storage.saveMerge(local,replay,_baseGen).then(function(m){_saveError=null;adoptMerged(m,sentStr);renderStatus();},function(e){_dirty=true;onSaveErr(e);}).then(function(){_saving=false;if(_pendingSave||(_dirty&&!_saveError)){_pendingSave=false;persist();}});
     }
     _lastSaved=js;var r=storage.save(model);
     return (r&&r.then)?r.catch(function(e){_lastSaved=null;onSaveErr(e);}):Promise.resolve();
   }
   function doSave(){doSaveCore();}
-  function doSaveSync(){if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}if(!_dirty)return;var js=JSON.stringify(model);if(js===_lastSaved){_dirty=false;return;}_dirty=false;_lastSaved=js;try{if(storage&&storage.saveSync){storage.saveSync(model);}else{var r=storage.save(model);if(r&&r.then)r.catch(function(){});}}catch(e){_lastSaved=null;}}
+  // Kein synchroner Speicherpfad beim Schliessen (frueher: blinder Manifest-PUT + Loeschen -> Totalverlust).
+  // Beim Verlassen/Verstecken nur den normalen async Copy-on-Write-Save anstossen; wird er vom Browser
+  // abgebrochen, bleibt der alte Stand gueltig (es wird beim Entladen nie etwas geloescht).
+  function flushPendingAsync(){if(_dirty&&!isReadOnly())doSaveCore();}
+  function hasUnsaved(){return !isReadOnly()&&(_dirty||_saving||!!_saveTimer);}
   function persist(){_dirty=true;if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(doSave,1500);}
 
   /* --- Baustein 1: Update-Hinweis per Generations-Polling -----------------
@@ -504,13 +403,13 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   function hideUpdateBanner(){var el=document.getElementById("wp-update");if(el)el.style.display="none";}
   // Klick l-> frisch laden = korrekter Stand + Version. Offene eigene Edits werden
   // zuvor gemergt gespeichert, statt verworfen zu werden.
-  function reloadModel(){if(!(IS_CONF&&storage&&storage.load))return Promise.resolve();return storage.load().then(function(data){if(!data)return;upgradeData(data);if(!data.members||!data.members.length)data.members=__members;if(IS_CONF&&__members)data.members=__members;model=data;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});_lastSaved=JSON.stringify(model);_dirty=false;});}
+  function reloadModel(){if(!(IS_CONF&&storage&&storage.load))return Promise.resolve();return storage.load().then(function(data){if(!data)return;upgradeData(data);if(!data.members||!data.members.length)data.members=__members;if(IS_CONF&&__members)data.members=__members;model=data;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});_lastSaved=JSON.stringify(model);_dirty=false;_saveError=null;_loadError=null;syncBaseGen();},function(e){_loadError=e;renderStatus();throw e;});}
   function applyPendingUpdate(){
     function refresh(){return reloadModel().then(function(){hideUpdateBanner();render();setStatus("Aktualisiert.");});}
     if(_dirty){doSaveCore().then(function(){if(_dirty){setStatus("Speichern fehlgeschlagen \u2014 Aktualisierung abgebrochen.",true);}else{refresh().catch(onSaveErr);}});}
     else{refresh().catch(onSaveErr);}
   }
-  function pollVersion(){if(_polling||!IS_CONF||document.hidden)return;if(!storage||!storage.peekServerGen||!storage.currentGen)return;_polling=true;storage.peekServerGen().then(function(g){_polling=false;if(g>storage.currentGen())showUpdateBanner();}).catch(function(){_polling=false;});}
+  function pollVersion(){if(_polling||!IS_CONF||document.hidden)return;if(!storage||!storage.peekServerGen||!storage.currentGen)return;_polling=true;storage.peekServerGen().then(function(g){_polling=false;if(g>_baseGen)showUpdateBanner();}).catch(function(){_polling=false;});}
   function startPolling(){if(_pollTimer||!IS_CONF)return;_pollTimer=setInterval(pollVersion,60000);document.addEventListener("visibilitychange",function(){if(!document.hidden)pollVersion();});}
   function find(id){for(var i=0;i<model.requests.length;i++)if(model.requests[i].id===id)return model.requests[i];return null;}
   function initials(name){var p=name.trim().split(/\s+/);return (p.length>1?(p[0][0]+p[1][0]):name.slice(0,2)).toUpperCase();}
@@ -531,7 +430,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   function pool(id){var r=find(id);if(!r)return;poolRemind(r);render();}
   function anlegen(){var dt=document.getElementById("g-date").value,nm=document.getElementById("g-name").value.trim(),h=document.getElementById("g-hint");if(!dt){h.innerHTML='<span style="color:var(--danger)">Bitte ein Datum waehlen.</span>';return;}if(!nm){h.innerHTML='<span style="color:var(--danger)">Bitte Dienst von angeben.</span>';return;}var adm=isAdmin(),einEl=document.getElementById("g-ein"),bestEl=document.getElementById("g-best");var ein=(adm&&einEl&&einEl.value)?einEl.value:todayIso;var bst=(adm&&bestEl&&bestEl.value&&byId[bestEl.value])?bestEl.value:null;var m=model.members.filter(function(x){return x.name.toLowerCase()===nm.toLowerCase();})[0];var nr={id:"n"+Date.now(),date:dt,dienstVon:nm,dienstVonUser:(m?m.id:(userCache[nm.toLowerCase()]||null)),eintragVom:ein,kann:(bst?[bst]:[]),best:bst,passed:[],remindedAt:null,confirmNotifiedAt:null,bestAt:(bst?ein:null)};model.requests.push(nr);log(byId[cur].name+' legt Gesuch an: '+fmt(dt)+' (Dienst von '+nm+')'+(m?'':' [Freitext]')+(bst?' — uebernommen von '+byId[bst].name:'')+(dt<todayIso?' [rueckwirkend]':''));feedEvent("bereitstellen",nr);persist();document.getElementById("g-name").value="";document.getElementById("g-date").value="";if(einEl)einEl.value="";if(bestEl)bestEl.value="";document.getElementById("g-hint").textContent="";document.getElementById("gcard").style.display="none";render();}
   function aufraeumen(){var cut=key(ad(today,-365));var old=model.requests.filter(function(r){return r.date<cut;});if(!old.length){alert("Keine Termine aelter als 12 Monate.");return;}if(!confirm(old.length+" Termine aelter als 12 Monate (vor "+cut+") endgueltig loeschen?"))return;model.requests=model.requests.filter(function(r){return r.date>=cut;});log(old.length+" alte Termine aufgeraeumt (vor "+cut+")");persist();render();}
-  function resetAll(){if(!confirm("Auf den migrierten Excel-Stand zuruecksetzen? Lokale Aenderungen gehen verloren."))return;storage.reset();model=storage.load();byId={};model.members.forEach(function(m){byId[m.id]=m;});act=[];runDueReminders();log("Daten auf Seed zurueckgesetzt");render();}
+  function resetAll(){if(IS_CONF){onSaveErr(new Error("Zur\u00fccksetzen ist in Confluence deaktiviert \u2013 \u00e4ltere St\u00e4nde bitte \u00fcber \u201eDatenst\u00e4nde (Admin)\u201c wiederherstellen."));return;}if(!confirm("Auf den migrierten Excel-Stand zuruecksetzen? Lokale Aenderungen gehen verloren."))return;storage.reset();model=storage.load();byId={};model.members.forEach(function(m){byId[m.id]=m;});act=[];runDueReminders();log("Daten auf Seed zurueckgesetzt");render();}
 
   // ---- Render: Ansicht A (Inbox) ----
   function inboxCard(r,mode,counts){
@@ -663,7 +562,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   function render(){
     var counts=yearCounts(model,curYear);
     var __w=document.getElementById("who");if(IS_CONF){__w.innerHTML="<option>"+(curName||cur)+"</option>";__w.disabled=true;}else{__w.innerHTML=model.members.slice().sort(function(a,b){return a.order-b.order;}).map(function(m){return '<option value="'+m.id+'"'+(m.id===cur?' selected':'')+'>'+m.name+'</option>';}).join("");}
-    var __ga=isAdmin();var __rb=document.getElementById("resetbtn");if(__rb)__rb.style.display=__ga?"":"none";var __sb=document.getElementById("selftestbtn");if(__sb)__sb.style.display=__ga?"":"none";var __sc=document.getElementById("selftest2card");if(__sc)__sc.style.display=__ga?"":"none";var __cb=document.getElementById("cleanbtn");if(__cb)__cb.style.display=__ga?"":"none";var __g1=document.getElementById("g-adm-ein");if(__g1)__g1.style.display=__ga?"":"none";var __g2=document.getElementById("g-adm-best");if(__g2)__g2.style.display=__ga?"":"none";
+    var __ga=isAdmin();var __rb=document.getElementById("resetbtn");if(__rb)__rb.style.display=__ga?"":"none";var __sb=document.getElementById("selftestbtn");if(__sb)__sb.style.display=__ga?"":"none";var __sc=document.getElementById("selftest2card");if(__sc)__sc.style.display=__ga?"":"none";var __cb=document.getElementById("cleanbtn");if(__cb)__cb.style.display=__ga?"":"none";var __dc=document.getElementById("dscard");if(__dc)__dc.style.display=(__ga&&IS_CONF)?"":"none";var __g1=document.getElementById("g-adm-ein");if(__g1)__g1.style.display=__ga?"":"none";var __g2=document.getElementById("g-adm-best");if(__g2)__g2.style.display=__ga?"":"none";
     var minc=Math.min.apply(null,model.members.map(function(m){return counts[m.id]||0;}));
     document.getElementById("counts").innerHTML=model.members.slice().sort(function(a,b){return a.order-b.order;}).map(function(m){var c=counts[m.id]||0;return '<span class="chip'+(c===minc?" lo":"")+(m.id===cur?" me":"")+'"><b>'+m.name+'</b><span class="n">'+c+'</span></span>';}).join("");
     renderMyReq();renderExport();renderA(counts);renderC(counts);
@@ -673,9 +572,43 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     document.getElementById("tab-c").classList.toggle("act",view==="c");
     document.getElementById("log").innerHTML=act.length?act.map(function(a){return '<div'+(a.o?' class="ov"':'')+'><span class="t">'+a.t+'</span>  '+a.m+'</div>';}).join(""):'<span class="em">noch keine Aktivität</span>';
     if(detailId!=null)renderDetail();
+    renderStatus();
     selftest();
   }
-  function selftest(){if(!SEED){var dg=document.getElementById("diag");if(dg)dg.innerHTML='<span class="em">Selbsttest nur im lokalen Modus.</span>';return;}var lines=[];function chk(l,c){lines.push('<div class="'+(c?'pass':'fail')+'">'+(c?'✓':'✗')+' '+l+'</div>');}var s0=SEED;var exp={anika:1,brigitte:2,christiane:1,christine:1,christoph:1,daniel:3,fabienne:2,ines:2,johanna:3,konstantin:2,leo:2};var c26=yearCounts(s0,2026),cOk=Object.keys(exp).every(function(k){return c26[k]===exp[k];});Object.keys(c26).forEach(function(k){if(!(k in exp)&&c26[k]!==0)cOk=false;});chk("Engine: Jahres-Zähler 2026 == Excel (Seed)",cOk);var fx={a:{id:"a",order:0,name:"A"},b:{id:"b",order:1,name:"B"}};var bI=byId;byId=fx;var s1=suggestFor({id:"x1",best:null,kann:["a","b"]},fx,{a:2,b:0});var s2=suggestFor({id:"x2",best:null,kann:["a","b"]},fx,{a:1,b:1});var s2b=suggestFor({id:"x2",best:null,kann:["a","b"]},fx,{a:1,b:1});var dist={a:0,b:0};for(var ii=0;ii<200;ii++){dist[suggestFor({id:"q"+ii,best:null,kann:["a","b"]},fx,{a:1,b:1}).pick]++;}byId=bI;chk("Vorschlag: nur Gleichauf-Minimum",s1.tied.length===1&&s1.pick==="b"&&s2.tied.length===2);chk("Vorschlag stabil je Termin",s2.pick===s2b.pick);chk("Vorschlag fair verteilt (a:"+dist.a+" b:"+dist.b+")",dist.a>40&&dist.b>40);chk("Live: höchstens eine gültige Vertretung",model.requests.every(function(r){return r.best===null||!!byId[r.best];}));var dueLeft=model.requests.filter(function(r){return r.best&&r.date>=todayIso&&!r.remindedAt&&days(todayIso,r.date)<=lead();}).length;chk("Erinnerung: keine fälligen offen (opportunistisch verschickt)",dueLeft===0);var b=JSON.stringify(model);storage.save(model);chk("Live: save()/load()-Roundtrip verlustfrei",b===JSON.stringify(storage.load()));document.getElementById("diag").innerHTML=lines.join("");}
+  function selftest(){if(!SEED||IS_CONF){var dg=document.getElementById("diag");if(dg)dg.innerHTML='<span class="em">Selbsttest nur im lokalen Modus.</span>';return;}var lines=[];function chk(l,c){lines.push('<div class="'+(c?'pass':'fail')+'">'+(c?'✓':'✗')+' '+l+'</div>');}var s0=SEED;var exp={anika:1,brigitte:2,christiane:1,christine:1,christoph:1,daniel:3,fabienne:2,ines:2,johanna:3,konstantin:2,leo:2};var c26=yearCounts(s0,2026),cOk=Object.keys(exp).every(function(k){return c26[k]===exp[k];});Object.keys(c26).forEach(function(k){if(!(k in exp)&&c26[k]!==0)cOk=false;});chk("Engine: Jahres-Zähler 2026 == Excel (Seed)",cOk);var fx={a:{id:"a",order:0,name:"A"},b:{id:"b",order:1,name:"B"}};var bI=byId;byId=fx;var s1=suggestFor({id:"x1",best:null,kann:["a","b"]},fx,{a:2,b:0});var s2=suggestFor({id:"x2",best:null,kann:["a","b"]},fx,{a:1,b:1});var s2b=suggestFor({id:"x2",best:null,kann:["a","b"]},fx,{a:1,b:1});var dist={a:0,b:0};for(var ii=0;ii<200;ii++){dist[suggestFor({id:"q"+ii,best:null,kann:["a","b"]},fx,{a:1,b:1}).pick]++;}byId=bI;chk("Vorschlag: nur Gleichauf-Minimum",s1.tied.length===1&&s1.pick==="b"&&s2.tied.length===2);chk("Vorschlag stabil je Termin",s2.pick===s2b.pick);chk("Vorschlag fair verteilt (a:"+dist.a+" b:"+dist.b+")",dist.a>40&&dist.b>40);chk("Live: höchstens eine gültige Vertretung",model.requests.every(function(r){return r.best===null||!!byId[r.best];}));var dueLeft=model.requests.filter(function(r){return r.best&&r.date>=todayIso&&!r.remindedAt&&days(todayIso,r.date)<=lead();}).length;chk("Erinnerung: keine fälligen offen (opportunistisch verschickt)",dueLeft===0);var b=JSON.stringify(model);storage.save(model);chk("Live: save()/load()-Roundtrip verlustfrei",b===JSON.stringify(storage.load()));document.getElementById("diag").innerHTML=lines.join("");}
+
+  /* ---- Admin: Datenstaende anzeigen + aelteren Stand als NEUE Generation wiederherstellen ---- */
+  function showDataStatesCard(){var c=document.getElementById("dscard");if(!c||!IS_CONF||!isAdmin())return;c.style.display="";var b=document.getElementById("dsload");if(b&&!b.__wired){b.__wired=true;b.addEventListener("click",renderDataStates);}}
+  function renderDataStates(){
+    var host=document.getElementById("dslist");if(!host||!storage||!storage.describe)return;
+    if(!isAdmin()){host.textContent="Nur f\u00fcr Administrator:innen.";return;}
+    host.textContent="Lese Datenst\u00e4nde \u2026";
+    storage.describe().then(function(d){
+      var rows=d.rows||[];
+      if(!rows.length){host.innerHTML='<div class="em">Keine Datenst\u00e4nde gefunden.</div>';return;}
+      var h='<div class="muted">Manifest: '+esc(d.manifest.key)+' \u00b7 Generation '+esc(d.manifest.gen)+'</div><table class="dstbl"><tr><th>Generation</th><th>Format</th><th>Eintr\u00e4ge</th><th>Lesbar</th><th></th></tr>';
+      rows.forEach(function(r,i){
+        h+='<tr class="'+(r.current?"cur":"")+(r.ok?"":" bad")+'"><td>'+r.gen+(r.current?" (aktuell)":"")+'</td><td>'+(r.layout==="legacy"?"alt (v2)":"neu")+'</td><td>'+(r.ok?r.entries:"\u2013")+'</td><td>'+(r.ok?"ja":"nein"+(r.error?": "+esc(r.error):""))+'</td><td>'+((r.ok&&!r.current)?'<button type="button" class="btn sm" data-ds="'+i+'">Wiederherstellen</button>':"")+'</td></tr>';
+      });
+      host.innerHTML=h+'</table>';
+      var bs=host.querySelectorAll("button[data-ds]");
+      for(var j=0;j<bs.length;j++){bs[j].onclick=function(){restoreDataState(rows[+this.getAttribute("data-ds")]);};}
+    }).catch(function(e){host.innerHTML='<div class="fail">Datenst\u00e4nde nicht lesbar: '+esc(e.message||String(e))+'</div>';});
+  }
+  function restoreDataState(row){
+    if(!row||!isAdmin())return;
+    if(!confirm("Datenstand Generation "+row.gen+" ("+row.entries+" Eintr\u00e4ge) als neuen aktuellen Stand \u00fcbernehmen?\nSp\u00e4tere \u00c4nderungen sind danach nicht mehr aktuell (bleiben aber als Historie erhalten)."+(_dirty?"\nAchtung: deine noch nicht gespeicherten \u00c4nderungen werden verworfen.":"")))return;
+    if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}_dirty=false;
+    storage.restore(row).then(function(r){
+      if(!r||!r.ok)throw new Error((r&&r.error)||"Wiederherstellung fehlgeschlagen");
+      _loadError=null;_saveError=null;
+      return reloadModel().then(function(){
+        if(!model)return;log(byId[cur].name+" (Admin) stellt Datenstand Generation "+row.gen+" wieder her (neu: "+r.gen+")");
+        if(typeof start==="function"&&!_started){start();}else{render();}
+        renderDataStates();
+      });
+    }).catch(function(e){onSaveErr(e);});
+  }
 
   // ---- Events ----
   function selftest2(){
@@ -870,11 +803,26 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   html='<div style="font-weight:700;color:'+(allok?"#216e4e":"#ae2a19")+'">'+(allok?"Alle Tests gruen":"Rote Tests vorhanden")+'</div>'+html;
   out.innerHTML=html;
 }
-  function boot(){try{injectStyle();buildShell();}catch(e){showError(e);return;}if(IS_CONF){loadConfluence().then(function(idr){__members=idr.members;cur=idr.cur;curName=idr.curName;byId={};__members.forEach(function(m){byId[m.id]=m;});storage=PropertyStore();return storage.load();}).then(function(data){if(data){if(!data.members||!data.members.length)data.members=__members;if(upgradeData(data)){if(window.console)console.log("[WP] wpdata: version gesetzt, Daten unveraendert uebernommen");storage.save(data).catch(showError);}return data;}return getSeed().then(function(sd){SEED=sd;var m=remapSeed(sd,__members);if(__importDiag){showInfo(__importDiag);}return storage.save(m).then(function(){return m;});});}).then(function(data){model=data;model.members=__members;byId={};__members.forEach(function(m){byId[m.id]=m;});start();}).catch(showError);}else{getSeed().then(function(sd){SEED=sd;storage=makeStorage(sd);var data=storage.load();model=data;byId={};model.members.forEach(function(m){byId[m.id]=m;});cur=getLS(UKEY,null);if(!cur||!byId[cur])cur=model.members.slice().sort(function(a,b){return a.order-b.order;})[0].id;start();}).catch(showError);}}function start(){document.body.addEventListener("click",function(ev){var cl=ev.target.closest("[data-modal-close]");if(cl){closeDetail();return;}var b=ev.target.closest("button[data-act]");if(b){var id=b.getAttribute("data-id"),a=b.getAttribute("data-act");if(a==="adm-head"){admHead(id);return;}if(a==="adm-kann"){admKann(id,b.getAttribute("data-uid"));return;}if(a==="adm-best"){admBest(id);return;}var fn=({kann:toggleKann,ueb:uebernehmen,frei:freigeben,remind:remind,pool:pool,del:loeschen,pass:pass})[a];if(fn)fn(id);return;}var dc=ev.target.closest("[data-detail]");if(dc){openDetail(dc.getAttribute("data-detail"));return;}});document.addEventListener("keydown",function(ev){if((ev.key==="Escape"||ev.keyCode===27)&&detailId!=null)closeDetail();});
+  function boot(){try{injectStyle();buildShell();}catch(e){showError(e);return;}if(IS_CONF){loadConfluence().then(function(idr){__members=idr.members;cur=idr.cur;curName=idr.curName;byId={};__members.forEach(function(m){byId[m.id]=m;});storage=PropertyStore();return storage.load().then(null,function(e){_loadError=e;throw e;});}).then(function(data){
+      // Daten vorhanden (neues Format, Altformat wpstore v2 oder Alt-Anhang): NICHT beim Laden speichern;
+      // Migration ins neue Format passiert beim ersten echten Speichern (Versionsstempel inklusive).
+      if(data){if(!data.members||!data.members.length)data.members=__members;upgradeData(data);return data;}
+      // Nur wenn sicher KEINE Daten existieren (kein Manifest, kein Alt-Anhang): Erst-Import aus seed.json.
+      // save() ueberschreibt dabei nie Daten, die ein anderer Tab inzwischen angelegt hat.
+      return getSeed().then(function(sd){SEED=sd;var m=remapSeed(sd,__members);if(__importDiag){showInfo(__importDiag);}return storage.save(m);});
+    }).then(function(data){model=data;model.members=__members;byId={};__members.forEach(function(m){byId[m.id]=m;});start();}).catch(function(e){
+      if(window.console)console.error("[WP] Ladefehler",e);
+      if(storage&&byId[cur]){_loadError=_loadError||e;renderStatus();showDataStatesCard();}else{showError(e);}
+    });}else{getSeed().then(function(sd){SEED=sd;storage=makeStorage(sd);var data=storage.load();model=data;byId={};model.members.forEach(function(m){byId[m.id]=m;});cur=getLS(UKEY,null);if(!cur||!byId[cur])cur=model.members.slice().sort(function(a,b){return a.order-b.order;})[0].id;start();}).catch(showError);}}var _started=false;function start(){_started=true;document.body.addEventListener("click",function(ev){var cl=ev.target.closest("[data-modal-close]");if(cl){closeDetail();return;}var b=ev.target.closest("button[data-act]");if(b&&isReadOnly()){onSaveErr(new Error("Schreibgesch\u00fctzt \u2013 \u00c4nderungen sind gerade nicht m\u00f6glich."));return;}if(b){var id=b.getAttribute("data-id"),a=b.getAttribute("data-act");if(a==="adm-head"){admHead(id);return;}if(a==="adm-kann"){admKann(id,b.getAttribute("data-uid"));return;}if(a==="adm-best"){admBest(id);return;}var fn=({kann:toggleKann,ueb:uebernehmen,frei:freigeben,remind:remind,pool:pool,del:loeschen,pass:pass})[a];if(fn)fn(id);return;}var dc=ev.target.closest("[data-detail]");if(dc){openDetail(dc.getAttribute("data-detail"));return;}});document.addEventListener("keydown",function(ev){if((ev.key==="Escape"||ev.keyCode===27)&&detailId!=null)closeDetail();});
   document.getElementById("who").addEventListener("change",function(e){cur=e.target.value;setLS(UKEY,cur);render();});
   document.getElementById("tab-a").addEventListener("click",function(){view="a";setLS(VKEY,view);render();});
   document.getElementById("tab-c").addEventListener("click",function(){view="c";setLS(VKEY,view);render();});
-  document.getElementById("addbtn").addEventListener("click",function(){var gc=document.getElementById("gcard");gc.style.display=(!gc.style.display||gc.style.display==="none")?"block":"none";});_lastSaved=JSON.stringify(model);window.addEventListener("beforeunload",function(){doSaveSync();flushActivityNow();});document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"){doSaveSync();flushActivityNow();}});var __ey=document.getElementById("exp-year");if(__ey)__ey.addEventListener("change",function(){expYear=parseInt(this.value,10);renderExport();});var __ec=document.getElementById("exp-csv");if(__ec)__ec.addEventListener("click",function(){downloadCsv(expYear);});
+  document.getElementById("addbtn").addEventListener("click",function(){var gc=document.getElementById("gcard");gc.style.display=(!gc.style.display||gc.style.display==="none")?"block":"none";});_lastSaved=JSON.stringify(model);syncBaseGen();
+  // Schliessen/Verstecken: nur async Copy-on-Write-Save anstossen (nie synchron, nie loeschen) und bei
+  // offenen Aenderungen den Browser-Hinweis "Seite verlassen?" ausloesen.
+  window.addEventListener("beforeunload",function(ev){flushActivityNow();if(hasUnsaved()){flushPendingAsync();ev.preventDefault();ev.returnValue="";return "";}});
+  document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"){flushPendingAsync();flushActivityNow();}});
+  var __dsl=document.getElementById("dsload");if(__dsl&&!__dsl.__wired){__dsl.__wired=true;__dsl.addEventListener("click",renderDataStates);}var __ey=document.getElementById("exp-year");if(__ey)__ey.addEventListener("change",function(){expYear=parseInt(this.value,10);renderExport();});var __ec=document.getElementById("exp-csv");if(__ec)__ec.addEventListener("click",function(){downloadCsv(expYear);});
   document.getElementById("savebtn").addEventListener("click",anlegen);
   document.getElementById("resetbtn").addEventListener("click",resetAll);
   
@@ -888,7 +836,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   
   document.getElementById("cy").textContent=curYear;
   document.getElementById("tline").textContent="↑ ab heute   ·   darunter vergangene Termine";
-  runDueReminders();
+  if(!isReadOnly())runDueReminders();
   render();
   if(IS_CONF){wireUserSearch();startPolling();}
 }
