@@ -2,7 +2,7 @@
    Persistenz: persistence.js (muss VOR app.js geladen sein, s. htmlMacro.html). */
 (function(){
   "use strict";var GROUP="Wochenendpräsenz";var userCache={};
-var BUILD_VERSION="__BUILD_VERSION__";if(BUILD_VERSION.indexOf("__")===0)BUILD_VERSION="dev";  // build.sh setzt git describe ein
+var BUILD_VERSION="__BUILD_VERSION__";if(BUILD_VERSION.indexOf("__")===0)BUILD_VERSION="dev";window.WP_BUILD=BUILD_VERSION;  // build.sh setzt git describe ein
 if(window.console)console.log("[WP] Vertretungspool Build "+BUILD_VERSION);
 function wpAdmins(){var list=(window.WP_ADMINS&&window.WP_ADMINS.length)?window.WP_ADMINS:[];var out=[];for(var i=0;i<list.length;i++){out.push(String(list[i]).toLowerCase());}return out;}
 function isAdmin(){var m=byId[cur]||null;var uname=String((m&&m.username)||"").toLowerCase();var ukey=String((m&&m.id)||cur||"").toLowerCase();var A=wpAdmins();for(var i=0;i<A.length;i++){if(A[i]&&(A[i]===uname||A[i]===ukey))return true;}return false;}
