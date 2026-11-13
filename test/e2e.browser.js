@@ -129,6 +129,16 @@ var me = { current: { userKey: "carsten", username: "carsten", displayName: "Car
     await new Promise(function (r) { setTimeout(r, 2000); });
     var G = new P.Store(env.mt); await G.load();
     ok("E2E: Wiederherstellung -> neue Generation, nicht mehr schreibgeschützt", !G.readOnly && G.gen > man.gen && (await pg3.locator("#wp-recbar").count()) === 0 && !(await pg3.evaluate(function () { return document.getElementById("wp-root").classList.contains("wp-ro"); })));
+    // 7) Nicht-Mitglied (nicht in der Gruppe): nur Ansicht, kein Gesuch, kein Schreiben, keine JS-Fehler
+    var meSave = me.current; me.current = { userKey: "gast", username: "gast", displayName: "Gabi Gast" };
+    var w7 = env.mt.writes, pg7 = await open();
+    ok("E2E Gast: Nur-Ansicht-Banner, Termine sichtbar", (await pg7.locator("#wp-guestbar").count()) === 1 && (await pg7.locator("#future .row").count()) === 2);
+    ok("E2E Gast: + Gesuch und Aktionsknöpfe ausgeblendet", !(await pg7.locator("#addbtn").isVisible()) && !(await pg7.locator('#future .row [data-act="kann"]').first().isVisible()));
+    await pg7.evaluate(function () { document.getElementById("g-date").value = "2027-07-03"; document.getElementById("g-name").value = "Gabi Gast"; document.getElementById("savebtn").click(); var b = document.querySelector('[data-act="kann"]'); if (b) b.click(); });
+    await new Promise(function (r) { setTimeout(r, 2500); });
+    var G7 = new P.Store(env.mt); var m7 = await G7.load();
+    ok("E2E Gast: erzwungene Klicks ändern und speichern nichts", env.mt.writes === w7 && m7.requests.length === 2 && (await pg7.locator("#future .row").count()) === 2);
+    me.current = meSave; await pg7.close();
     ok("E2E: keine JS-Fehler", errors.length === 0, errors.join(" | "));
   } catch (e) { console.error(e); ok("E2E ohne Ausnahme", false, String(e)); }
   await browser.close(); srv.close();

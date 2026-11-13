@@ -24,6 +24,7 @@ module.exports = function () {
   ok("app.js: Build-Version-Platzhalter + Anzeige im Fuß/Konsole", /var BUILD_VERSION="__BUILD_VERSION__"/.test(app) && /"Build "\+BUILD_VERSION/.test(app) && /console\.log\("\[WP\] Vertretungspool Build "/.test(app));
 
   ok("app.js: Engine-Selbsttest (save/load-Roundtrip) läuft nie gegen Confluence", /function selftest\(\)\{if\(!SEED\|\|IS_CONF\)\{/.test(app));
+  ok("app.js: Nicht-Mitglieder nur Ansicht (isGuest, kein ungeschütztes byId[cur].name)", /function isGuest\(\)/.test(app) && (app.match(/byId\[cur\]\.name/g) || []).length === 1 && /function anlegen\(\)\{if\(isGuest\(\)\)return;/.test(app) && /function runDueReminders\(\)\{if\(isGuest\(\)\)return;/.test(app));
   ok("htmlMacro: lädt persistence.js vor app.js", /\["persistence\.js", "app\.js"\]/.test(macro));
   ok("htmlMacro: kein eigenes Cache-Busting (Confluence versioniert Anhänge)", !/Date\.now\(\)/.test(macro) && !/\?v=/.test(macro));
   ok("htmlMacro: kein CDATA / keine Velocity-$", !/CDATA/.test(macro) && !/\$[a-zA-Z{]/.test(macro));
