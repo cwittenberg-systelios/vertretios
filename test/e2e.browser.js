@@ -72,7 +72,7 @@ var me = { current: { userKey: "carsten", username: "carsten", displayName: "Car
     var pg = await open();
     ok("E2E: App lädt Altformat (2 Termine)", (await pg.locator("#future .row").count()) === 2);
     ok("E2E: Laden schreibt nichts", JSON.stringify(env.mt.store) === before);
-    ok("E2E: Skripte mit Cache-Bust geladen, persistence.js zuerst", env.scriptHits.length === 2 && /persistence\.js\?v=\d+/.test(env.scriptHits[0]) && /app\.js\?v=\d+/.test(env.scriptHits[1]));
+    ok("E2E: Skripte ohne ?v= geladen, persistence.js zuerst", env.scriptHits.length === 2 && /persistence\.js$/.test(env.scriptHits[0]) && /app\.js$/.test(env.scriptHits[1]));
     ok("E2E: Build-Version im Fuß", /Build dev/.test(await pg.locator("#wp-foot").innerText()));
     // 2) Änderung -> Migration beim ersten Speichern
     await pg.locator('#future .row [data-act="kann"]').first().click();

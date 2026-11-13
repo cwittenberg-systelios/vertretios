@@ -5,7 +5,7 @@ Vertretungspool planer (Wochenendpräsenz) – Confluence-HTML/JS-App (Server 7.
 
 | Datei | Zweck |
 |---|---|
-| `htmlMacro.html` | Inhalt des HTML-Makros. Lädt `persistence.js` und dann `app.js` als Seiten-Anhänge, jeweils mit Cache-Bust `?v=Date.now()`. Enthält `WP_ADMINS`. |
+| `htmlMacro.html` | Inhalt des HTML-Makros. Lädt `persistence.js` und dann `app.js` als Seiten-Anhänge (ohne eigenes Cache-Busting – das übernimmt Confluence). Enthält `WP_ADMINS`. |
 | `persistence.js` | Persistenz-Schicht (Port von `urlaubios/persistence.js` 1.1.3): Store-Klasse und Confluence-Transport. |
 | `app.js` | App (UI, Logik). Nutzt `window.VertretiosPersistence`. |
 | `build.sh` | Führt die Tests aus, setzt die Build-Version (`git describe`) in `app.js` ein und legt die Deploy-Dateien in `dist/deploy/` ab. |
@@ -45,7 +45,7 @@ Das Verhalten im Einzelnen:
 1. `sh build.sh` ausführen. Alle Tests müssen grün sein.
 2. **Zuerst** `dist/deploy/persistence.js` als neuen Anhang an die App-Seite hängen. Er schadet nicht, solange das Makro ihn noch nicht lädt.
 3. Dann den Inhalt des HTML-Makros durch `dist/deploy/htmlMacro.html` ersetzen (`WP_ADMINS` übernehmen!) und die Seite veröffentlichen. Die alte `app.js` läuft damit unverändert weiter, weil sie `persistence.js` ignoriert.
-4. **Direkt danach** `dist/deploy/app.js` als neue Version des Anhangs `app.js` hochladen. Ab jetzt läuft die neue Version: Dank Cache-Bust laden alle Nutzer:innen beim nächsten Seitenaufruf die neue Datei.
+4. **Direkt danach** `dist/deploy/app.js` als neue Version des Anhangs `app.js` hochladen. Ab jetzt läuft die neue Version: Confluence liefert die neue Anhang-Version aus; alle Nutzer:innen bekommen sie beim nächsten Seitenaufruf.
 5. Seite selbst neu laden. Im Fuß muss die neue Build-Version stehen. Das Laden allein schreibt nichts.
 6. **Alle Nutzer:innen bitten, die Seite neu zu laden** (offene Tabs schließen). Erst mit dem ersten Speichern einer neuen Version wird das neue Format „scharf“: `wpstore` wird dann zum Platzhalter. Ab diesem Moment scheitern alte, noch offene Tabs beim Laden und Speichern, statt Daten zu überschreiben.
 7. Nachkontrolle: als Admin „Datenstände anzeigen“ öffnen. Die aktuelle Generation (neu) muss lesbar sein, und der alte Stand (`alt (v2)`) muss als Historie gelistet sein.

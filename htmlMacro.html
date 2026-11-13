@@ -5,8 +5,8 @@
      Sanitizer/Velocity).
      persistence.js + app.js + seed.json + (Logo) als ANHAENGE dieser
      Seite hochladen (Build-Dateien aus dist/deploy, s. README).
-     Reihenfolge: persistence.js VOR app.js. Cache-Bust ?v=Date.now(),
-     damit nie eine alte, gecachte app.js laeuft.
+     Reihenfolge: persistence.js VOR app.js. Kein eigenes Cache-Busting:
+     Confluence liefert nach dem Hochladen die neue Anhang-Version aus.
      =========================================================== -->
 <div id="wp-root"><!-- wird durch app.js befuellt --></div>
 <script type="text/javascript">
@@ -59,13 +59,12 @@
             return;
         }
         var files = ["persistence.js", "app.js"];
-        var bust = Date.now();
         function next(i) {
             if (i >= files.length) {
                 return;
             }
             var s = document.createElement("script");
-            s.src = getCtx() + "/download/attachments/" + pid + "/" + files[i] + "?v=" + bust;
+            s.src = getCtx() + "/download/attachments/" + pid + "/" + files[i];
             s.async = false;
             s.onload = function () {
                 next(i + 1);

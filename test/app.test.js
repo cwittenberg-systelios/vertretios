@@ -1,5 +1,5 @@
 /* Statische Prüfungen app.js / htmlMacro.html (ohne Browser): gefährliche Pfade entfernt,
- * Bootstrap mit Cache-Bust und richtiger Reihenfolge, Build-Version, Syntax. */
+ * Bootstrap ohne eigenes Cache-Busting, richtige Reihenfolge, Build-Version, Syntax. */
 "use strict";
 var fs = require("fs"), path = require("path"), vm = require("vm");
 var H = require("./helpers"), ok = H.ok;
@@ -25,7 +25,7 @@ module.exports = function () {
 
   ok("app.js: Engine-Selbsttest (save/load-Roundtrip) läuft nie gegen Confluence", /function selftest\(\)\{if\(!SEED\|\|IS_CONF\)\{/.test(app));
   ok("htmlMacro: lädt persistence.js vor app.js", /\["persistence\.js", "app\.js"\]/.test(macro));
-  ok("htmlMacro: Cache-Bust ?v=Date.now()", /Date\.now\(\)/.test(macro) && /"\?v=" \+ bust/.test(macro));
+  ok("htmlMacro: kein eigenes Cache-Busting (Confluence versioniert Anhänge)", !/Date\.now\(\)/.test(macro) && !/\?v=/.test(macro));
   ok("htmlMacro: kein CDATA / keine Velocity-$", !/CDATA/.test(macro) && !/\$[a-zA-Z{]/.test(macro));
   ok("htmlMacro: WP_ADMINS bleibt Admin-Konzept", /window\.WP_ADMINS\s*=/.test(macro));
   return Promise.resolve();
