@@ -13,154 +13,153 @@ function isGuest(){return !isMember()&&!isAdmin();}
 function meName(){return (byId[cur]&&byId[cur].name)||curName||String(cur||"");}
 function needMember(){if(isMember())return true;alert("Nur Mitglieder des Vertretungspools (Gruppe \u201e"+GROUP+"\u201c) k\u00f6nnen sich selbst eintragen. Als Admin bitte im Detail-Dialog zuweisen.");return false;}
 function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)return false;return isOwner(r);}var __importDiag=null;var __CSS=`
-  :root{
-    --fg:#172b4d;--muted:#5e6c84;--line:#dfe1e6;--bg:#fff;--soft:#f4f5f7;--r:6px;
+  #wp-root{
+    --fg:#172b4d;--muted:#5e6c84;--line:#dfe1e6;--bg:#fff;--border:#dfe1e6;--soft:#f4f5f7;--r:6px;
     --info:#0747a6;--infobg:#deebff;--ok:#216e4e;--okbg:#dcfff1;
     --amber:#974f0c;--amberbg:#fff7e6;--danger:#ae2a19;--dangerbg:#ffeceb;
     --c-sammeln:#4c9aff;--c-vergabe:#ffab00;--c-kritisch:#de350b;--c-vergeben:#36b37e;
     --c-erledigt:#c1c7d0;--c-durch:#de350b;
   }
-  *{box-sizing:border-box}
-  body{margin:0;font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg);background:var(--soft);padding:20px}
-  .wrap{max-width:920px;margin:0 auto}
-  h1{font-size:20px;font-weight:600;margin:0 0 2px}
-  .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
-  .printhead{display:none}
-  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
-  .bar .grow{flex:1}
-  label.id{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
-  select,input[type=date],input[type=text],input[type=number]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--fg)}
-  input[type=number]{width:110px}
-  .tabs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
-  .tabs button{font:inherit;font-size:13px;padding:6px 12px;border:0;background:#fff;color:var(--muted);cursor:pointer}
-  .tabs button.act{background:var(--info);color:#fff}
-  .btn{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--fg);cursor:pointer}
-  .btn:hover{background:var(--soft)}
-  .btn.prim{background:var(--info);border-color:var(--info);color:#fff}.btn.prim:hover{filter:brightness(1.08)}
-  .btn.on{background:var(--okbg);border-color:var(--c-vergeben);color:var(--ok)}
-  .btn.warn{border-color:var(--danger);color:var(--danger)}
-  .btn.sm{font-size:12px;padding:3px 8px}
-  .card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
-  .card h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 10px}
-  .chips{display:flex;flex-wrap:wrap;gap:6px}
-  .chip{background:var(--soft);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center}
-  .chip b{font-weight:600}.chip .n{background:var(--info);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;min-width:18px;text-align:center}
-  .chip.lo .n{background:var(--ok)}.chip.me{outline:2px solid var(--info)}
-  .gform{display:none;gap:10px;flex-wrap:wrap;align-items:flex-end}
-  .gform.open{display:flex}
-  .gform .f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
-  .ghint{font-size:12px;margin-top:6px}
+  #wp-root,#wp-root *{box-sizing:border-box}
+  #wp-root{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}
+  #wp-root .wrap{max-width:920px;margin:0 auto}
+  #wp-root h1{font-size:20px;font-weight:600;margin:0 0 2px}
+  #wp-root .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+  #wp-root .printhead{display:none}
+  #wp-root .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+  #wp-root .bar .grow{flex:1}
+  #wp-root label.id{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  #wp-root select,#wp-root input[type=date],#wp-root input[type=text],#wp-root input[type=number]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--fg)}
+  #wp-root input[type=number]{width:110px}
+  #wp-root .tabs{display:inline-flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  #wp-root .tabs button{font:inherit;font-size:13px;padding:6px 12px;border:0;background:#fff;color:var(--muted);cursor:pointer}
+  #wp-root .tabs button.act{background:var(--info);color:#fff}
+  #wp-root .btn{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--fg);cursor:pointer}
+  #wp-root .btn:hover{background:var(--soft)}
+  #wp-root .btn.prim{background:var(--info);border-color:var(--info);color:#fff}#wp-root .btn.prim:hover{filter:brightness(1.08)}
+  #wp-root .btn.on{background:var(--okbg);border-color:var(--c-vergeben);color:var(--ok)}
+  #wp-root .btn.warn{border-color:var(--danger);color:var(--danger)}
+  #wp-root .btn.sm{font-size:12px;padding:3px 8px}
+  #wp-root .card{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
+  #wp-root .card h2{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 10px}
+  #wp-root .chips{display:flex;flex-wrap:wrap;gap:6px}
+  #wp-root .chip{background:var(--soft);border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center}
+  #wp-root .chip b{font-weight:600}#wp-root .chip .n{background:var(--info);color:#fff;border-radius:10px;padding:0 6px;font-size:11px;min-width:18px;text-align:center}
+  #wp-root .chip.lo .n{background:var(--ok)}#wp-root .chip.me{outline:2px solid var(--info)}
+  #wp-root .gform{display:none;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  #wp-root .gform.open{display:flex}
+  #wp-root .gform .f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+  #wp-root .ghint{font-size:12px;margin-top:6px}
   /* Inbox (A) */
-  .sec{margin-bottom:14px}
-  .sec h3{font-size:13px;font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px}
-  .sec .cnt{background:var(--soft);color:var(--muted);border-radius:10px;font-size:11px;padding:0 7px}
-  .icard{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;margin-bottom:7px;background:#fff}
-  .icard.rec{border:2px solid var(--c-vergeben)}
-  .icard.crit{border-color:var(--c-kritisch)}.icard.mit{border-color:var(--info)}
-  .icard .t{font-weight:600}
-  .icard .m{font-size:12px;color:var(--muted);margin-top:2px}
-  .pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px}
-  .pill.rec{background:var(--okbg);color:var(--ok)}.pill.crit{background:var(--dangerbg);color:var(--danger)}.pill.due{background:var(--amberbg);color:var(--amber)}.pill.mit{background:var(--infobg);color:var(--info)}
-  .empty{color:var(--muted);font-size:13px;padding:6px 0}
-  .iacts{display:flex;gap:6px;flex:none}
+  #wp-root .sec{margin-bottom:14px}
+  #wp-root .sec h3{font-size:13px;font-weight:600;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+  #wp-root .sec .cnt{background:var(--soft);color:var(--muted);border-radius:10px;font-size:11px;padding:0 7px}
+  #wp-root .icard{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;margin-bottom:7px;background:#fff}
+  #wp-root .icard.rec{border:2px solid var(--c-vergeben)}
+  #wp-root .icard.crit{border-color:var(--c-kritisch)}#wp-root .icard.mit{border-color:var(--info)}
+  #wp-root .icard .t{font-weight:600}
+  #wp-root .icard .m{font-size:12px;color:var(--muted);margin-top:2px}
+  #wp-root .pill{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px}
+  #wp-root .pill.rec{background:var(--okbg);color:var(--ok)}#wp-root .pill.crit{background:var(--dangerbg);color:var(--danger)}#wp-root .pill.due{background:var(--amberbg);color:var(--amber)}#wp-root .pill.mit{background:var(--infobg);color:var(--info)}
+  #wp-root .empty{color:var(--muted);font-size:13px;padding:6px 0}
+  #wp-root .iacts{display:flex;gap:6px;flex:none}
   /* Liste (C) */
-  .month{font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 8px}
-  .row{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:8px;background:#fff}
-  .rail{width:4px;flex:none}
-  .rbody{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 12px;flex:1;min-width:0}
-  .dline{font-weight:600;white-space:nowrap}
-  .kw{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
-  .feier{display:inline-block;font-size:11px;color:var(--info);background:var(--infobg);border-radius:4px;padding:0 6px;margin-left:6px}
-  .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;margin-top:3px}
-  .b-sammeln{background:var(--infobg);color:var(--info)}.b-vergabe{background:var(--amberbg);color:var(--amber)}
-  .b-kritisch{background:var(--dangerbg);color:var(--danger)}.b-vergeben{background:var(--okbg);color:var(--ok)}.b-erledigt{background:var(--soft);color:var(--muted)}
-  .meta{color:var(--muted);font-size:12px;margin-top:3px}
-  .dran{color:var(--ok);font-weight:600}
-  .rright{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
-  .avs{display:flex}
-  .av{width:24px;height:24px;border-radius:50%;background:var(--soft);border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line);color:var(--muted);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:-6px;position:relative}
-  .av:first-child{margin-left:0}.av.sug{background:var(--okbg);color:var(--ok);box-shadow:0 0 0 1px var(--c-vergeben)}
-  .acts{display:flex;gap:6px}
-  .em{color:var(--muted);font-size:12px}
-  details summary{cursor:pointer;font-weight:600;color:var(--muted);font-size:13px;padding:6px 0}
-  .pastbar{display:flex;align-items:center;gap:12px}
-  .past .row{opacity:.7}
-  .log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7;max-height:160px;overflow:auto}
-  .log .t{color:var(--muted)} .log .ov{color:var(--danger);font-weight:600}
-  .diag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.8}
-  .guide{font-size:13px;line-height:1.6}.guide .sum{color:var(--muted)}.guide h4{font-size:13px;margin:12px 0 4px}.guide ul{margin:4px 0 8px 18px;padding:0}.guide li{margin:2px 0}.guide p{margin:4px 0}.hint-green{background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:5px;padding:10px 14px;font-size:14px;margin-bottom:6px}.hint-green a{color:#216e4e;font-weight:600}.muted{color:var(--muted);font-size:12px}.exptbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}.exptbl th,.exptbl td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);white-space:nowrap}.exptbl th{color:var(--muted);font-weight:600}.exptbl td:last-child,.exptbl th:last-child{text-align:right}.exptbl tr.x-crit td{color:var(--c-kritisch)}.exptbl tr.x-ok td:nth-child(4){color:var(--c-vergeben);font-weight:600}.statbox{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}.statbox h3{font-size:13px;margin:0 0 6px}.rank{margin:4px 0 0 20px;padding:0}.rank li{margin:1px 0}
-  .pass{color:var(--ok)}.fail{color:var(--danger);font-weight:600}
-  .tline{display:flex;align-items:center;gap:10px;margin:6px 0 12px;color:var(--danger);font-size:12px;font-weight:600}
-  .tline:before,.tline:after{content:"";height:1px;background:var(--danger);opacity:.35;flex:1}
+  #wp-root .month{font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 8px}
+  #wp-root .row{display:flex;align-items:stretch;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;margin-bottom:8px;background:#fff}
+  #wp-root .rail{width:4px;flex:none}
+  #wp-root .rbody{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:9px 12px;flex:1;min-width:0}
+  #wp-root .dline{font-weight:600;white-space:nowrap}
+  #wp-root .kw{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
+  #wp-root .feier{display:inline-block;font-size:11px;color:var(--info);background:var(--infobg);border-radius:4px;padding:0 6px;margin-left:6px}
+  #wp-root .badge{display:inline-block;font-size:11px;padding:1px 7px;border-radius:4px;font-weight:600;margin-top:3px}
+  #wp-root .b-sammeln{background:var(--infobg);color:var(--info)}#wp-root .b-vergabe{background:var(--amberbg);color:var(--amber)}
+  #wp-root .b-kritisch{background:var(--dangerbg);color:var(--danger)}#wp-root .b-vergeben{background:var(--okbg);color:var(--ok)}#wp-root .b-erledigt{background:var(--soft);color:var(--muted)}
+  #wp-root .meta{color:var(--muted);font-size:12px;margin-top:3px}
+  #wp-root .dran{color:var(--ok);font-weight:600}
+  #wp-root .rright{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+  #wp-root .avs{display:flex}
+  #wp-root .av{width:24px;height:24px;border-radius:50%;background:var(--soft);border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line);color:var(--muted);font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:-6px;position:relative}
+  #wp-root .av:first-child{margin-left:0}#wp-root .av.sug{background:var(--okbg);color:var(--ok);box-shadow:0 0 0 1px var(--c-vergeben)}
+  #wp-root .acts{display:flex;gap:6px}
+  #wp-root .em{color:var(--muted);font-size:12px}
+  #wp-root details summary{cursor:pointer;font-weight:600;color:var(--muted);font-size:13px;padding:6px 0}
+  #wp-root .pastbar{display:flex;align-items:center;gap:12px}
+  #wp-root .past .row{opacity:.7}
+  #wp-root .log{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.7;max-height:160px;overflow:auto}
+  #wp-root .log .t{color:var(--muted)} #wp-root .log .ov{color:var(--danger);font-weight:600}
+  #wp-root .diag{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.8}
+  #wp-root .guide{font-size:13px;line-height:1.6}#wp-root .guide .sum{color:var(--muted)}#wp-root .guide h4{font-size:13px;margin:12px 0 4px}#wp-root .guide ul{margin:4px 0 8px 18px;padding:0}#wp-root .guide li{margin:2px 0}#wp-root .guide p{margin:4px 0}#wp-root .hint-green{background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:5px;padding:10px 14px;font-size:14px;margin-bottom:6px}#wp-root .hint-green a{color:#216e4e;font-weight:600}#wp-root .muted{color:var(--muted);font-size:12px}#wp-root .exptbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}#wp-root .exptbl th,#wp-root .exptbl td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--border);white-space:nowrap}#wp-root .exptbl th{color:var(--muted);font-weight:600}#wp-root .exptbl td:last-child,#wp-root .exptbl th:last-child{text-align:right}#wp-root .exptbl tr.x-crit td{color:var(--c-kritisch)}#wp-root .exptbl tr.x-ok td:nth-child(4){color:var(--c-vergeben);font-weight:600}#wp-root .statbox{margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}#wp-root .statbox h3{font-size:13px;margin:0 0 6px}#wp-root .rank{margin:4px 0 0 20px;padding:0}#wp-root .rank li{margin:1px 0}
+  #wp-root .pass{color:var(--ok)}#wp-root .fail{color:var(--danger);font-weight:600}
+  #wp-root .tline{display:flex;align-items:center;gap:10px;margin:6px 0 12px;color:var(--danger);font-size:12px;font-weight:600}
+  #wp-root .tline:before,#wp-root .tline:after{content:"";height:1px;background:var(--danger);opacity:.35;flex:1}
   @media print{
-    @page{size:A4 landscape;margin:12mm}
-    body{background:#fff;padding:0;font-size:12px}
-    .wrap{max-width:none}
-    .bar,.gform,.acts,.iacts,.noprint,.tline,.log,.diag,details summary,.pastbar{display:none!important}
-    .printhead{display:flex!important;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--fg);padding-bottom:6px;margin-bottom:10px}
-    .printhead .logo{border:1px dashed var(--muted);color:var(--muted);font-size:11px;padding:10px 16px;border-radius:4px}
-    h1,.sub{display:none}
-    .row,.icard{break-inside:avoid}
-    .rright{display:none}
-    details{display:block!important}
+    #wp-root{font-size:12px}
+    #wp-root .wrap{max-width:none}
+    #wp-root .bar,#wp-root .gform,#wp-root .acts,#wp-root .iacts,#wp-root .noprint,#wp-root .tline,#wp-root .log,#wp-root .diag,#wp-root details summary,#wp-root .pastbar{display:none!important}
+    #wp-root .printhead{display:flex!important;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--fg);padding-bottom:6px;margin-bottom:10px}
+    #wp-root .printhead .logo{border:1px dashed var(--muted);color:var(--muted);font-size:11px;padding:10px 16px;border-radius:4px}
+    #wp-root h1,#wp-root .sub{display:none}
+    #wp-root .row,#wp-root .icard{break-inside:avoid}
+    #wp-root .rright{display:none}
+    #wp-root details{display:block!important}
   }
-  .wp-update-banner{display:none;align-items:center;gap:12px;background:var(--infobg);border:1px solid var(--c-sammeln);border-radius:var(--r);padding:8px 14px;margin:0 auto 12px;max-width:920px;font-size:13px;color:var(--info)}
-  .wp-update-banner .txt{flex:1;font-weight:600}
-  .wp-update-banner button{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--info);border-radius:var(--r);background:var(--info);color:#fff;cursor:pointer}
-  .wp-update-banner button:hover{filter:brightness(1.08)}
-  @media print{ .wp-update-banner{display:none!important} }
-  .clk{cursor:pointer}
-  .clk:hover{box-shadow:0 1px 0 var(--line),0 0 0 1px var(--c-sammeln) inset}
-  .row.clk:hover{box-shadow:0 0 0 1px var(--c-sammeln) inset}
-  .wp-modal-ov{position:fixed;inset:0;background:rgba(20,28,38,.45);z-index:9998}
-  .wp-modal{position:fixed;z-index:9999;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,92vw);max-height:88vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.28);padding:18px 20px}
-  .wp-modal-x{position:absolute;top:10px;right:12px;border:0;background:transparent;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 6px}
-  .wp-modal-x:hover{color:var(--fg)}
-  .wp-modal-h{padding-right:28px;margin-bottom:10px}
-  .wp-modal-h h3{margin:6px 0 0;font-size:17px}
-  .wp-modal-h .kw{font-size:11px;color:var(--muted);font-weight:600;margin-left:8px}
-  .wp-modal-b h4{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:14px 0 6px}
-  .dmeta{font-size:13px;color:var(--fg);padding:8px 10px;background:var(--soft);border-radius:6px}
-  .dempty{font-size:13px;color:var(--muted)}
-  .dapp{list-style:none;margin:0;padding:0}
-  .dapp li,.dsub{display:flex;align-items:center;gap:9px;padding:6px 4px;border-bottom:1px solid var(--border)}
-  .dsub{border:0;padding:8px 4px}
-  .dapp li:last-child{border-bottom:0}
-  .dav{width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--muted);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
-  .dav.sug{background:var(--okbg);color:var(--ok);box-shadow:0 0 0 1px var(--c-vergeben)}
-  .dav.ok{background:var(--okbg);color:var(--ok)}
-  .dnm{font-weight:600;font-size:13px}
-  .dcnt{font-size:11px;color:var(--muted);margin-left:auto}
-  .dtag{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px}
-  .dtag.pick{background:var(--okbg);color:var(--ok)}.dtag.tie{background:var(--infobg);color:var(--info)}.dtag.pass{background:var(--amberbg);color:var(--amber)}.dtag.me{background:var(--soft);color:var(--muted)}
-  .dtl{list-style:none;margin:0;padding:0;font-size:12.5px}
-  .dtl li{display:flex;gap:10px;padding:3px 4px}
-  .dtl .dtd{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;min-width:78px}
-  .wp-modal-f{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
-  .wp-modal-f:empty{display:none}
-  @media print{ .wp-modal-ov,.wp-modal{display:none!important} }
-  .admbox{margin-top:16px;padding-top:12px;border-top:2px dashed var(--line)}
-  .admbox h4{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--amber);margin:12px 0 6px}
-  .admgrid{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
-  .admf{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
-  .admf input,.admbox select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--fg)}
-  .admchips{display:flex;flex-wrap:wrap;gap:6px}
-  .admchip{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--fg);cursor:pointer}
-  .admchip:hover{background:var(--soft)}
-  .admchip.on{background:var(--okbg);border-color:var(--c-vergeben);color:var(--ok);font-weight:600}
-  @media print{ .admbox{display:none!important} }
-  .wp-errbar,.wp-warnbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-radius:var(--r);padding:9px 14px;margin:0 auto 12px;max-width:920px;font-size:13px}
-  .wp-errbar{background:var(--dangerbg);border:1px solid var(--danger);color:var(--danger)}
-  .wp-warnbar{background:var(--amberbg);border:1px solid var(--amber);color:var(--amber)}
-  .wp-errbar .txt,.wp-warnbar .txt{flex:1;min-width:200px}
-  .wp-ro .acts,.wp-ro .iacts,.wp-ro .wp-modal-f,.wp-ro .admbox,.wp-ro #addbtn,.wp-ro #gcard,.wp-ro #cleanbtn,.wp-ro #resetbtn{display:none!important}
-  .wp-guest .acts,.wp-guest .iacts,.wp-guest .wp-modal-f,.wp-guest #addbtn,.wp-guest #gcard,.wp-guest #myreq{display:none!important}
-  .wp-foot{color:var(--muted);font-size:11px;text-align:center;margin:8px 0 0}
-  .dstbl{width:100%;border-collapse:collapse;font-size:12px}
-  .dstbl th,.dstbl td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
-  .dstbl tr.cur td{font-weight:600;color:var(--ok)}
-  .dstbl tr.bad td{color:var(--danger)}
-  @media print{ .wp-errbar,.wp-warnbar,.wp-foot{display:none!important} }
+  #wp-root .wp-update-banner{display:none;align-items:center;gap:12px;background:var(--infobg);border:1px solid var(--c-sammeln);border-radius:var(--r);padding:8px 14px;margin:0 auto 12px;max-width:920px;font-size:13px;color:var(--info)}
+  #wp-root .wp-update-banner .txt{flex:1;font-weight:600}
+  #wp-root .wp-update-banner button{font:inherit;font-size:13px;padding:5px 10px;border:1px solid var(--info);border-radius:var(--r);background:var(--info);color:#fff;cursor:pointer}
+  #wp-root .wp-update-banner button:hover{filter:brightness(1.08)}
+  @media print{ #wp-root .wp-update-banner{display:none!important} }
+  #wp-root .clk{cursor:pointer}
+  #wp-root .clk:hover{box-shadow:0 1px 0 var(--line),0 0 0 1px var(--c-sammeln) inset}
+  #wp-root .row.clk:hover{box-shadow:0 0 0 1px var(--c-sammeln) inset}
+  #wp-root .wp-modal-ov{position:fixed;inset:0;background:rgba(20,28,38,.45);z-index:9998}
+  #wp-root .wp-modal{position:fixed;z-index:9999;top:50%;left:50%;transform:translate(-50%,-50%);width:min(560px,92vw);max-height:88vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.28);padding:18px 20px}
+  #wp-root .wp-modal-x{position:absolute;top:10px;right:12px;border:0;background:transparent;font-size:22px;line-height:1;color:var(--muted);cursor:pointer;padding:2px 6px}
+  #wp-root .wp-modal-x:hover{color:var(--fg)}
+  #wp-root .wp-modal-h{padding-right:28px;margin-bottom:10px}
+  #wp-root .wp-modal-h h3{margin:6px 0 0;font-size:17px}
+  #wp-root .wp-modal-h .kw{font-size:11px;color:var(--muted);font-weight:600;margin-left:8px}
+  #wp-root .wp-modal-b h4{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin:14px 0 6px}
+  #wp-root .dmeta{font-size:13px;color:var(--fg);padding:8px 10px;background:var(--soft);border-radius:6px}
+  #wp-root .dempty{font-size:13px;color:var(--muted)}
+  #wp-root .dapp{list-style:none;margin:0;padding:0}
+  #wp-root .dapp li,#wp-root .dsub{display:flex;align-items:center;gap:9px;padding:6px 4px;border-bottom:1px solid var(--border)}
+  #wp-root .dsub{border:0;padding:8px 4px}
+  #wp-root .dapp li:last-child{border-bottom:0}
+  #wp-root .dav{width:26px;height:26px;border-radius:50%;background:var(--soft);color:var(--muted);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+  #wp-root .dav.sug{background:var(--okbg);color:var(--ok);box-shadow:0 0 0 1px var(--c-vergeben)}
+  #wp-root .dav.ok{background:var(--okbg);color:var(--ok)}
+  #wp-root .dnm{font-weight:600;font-size:13px}
+  #wp-root .dcnt{font-size:11px;color:var(--muted);margin-left:auto}
+  #wp-root .dtag{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:6px}
+  #wp-root .dtag.pick{background:var(--okbg);color:var(--ok)}#wp-root .dtag.tie{background:var(--infobg);color:var(--info)}#wp-root .dtag.pass{background:var(--amberbg);color:var(--amber)}#wp-root .dtag.me{background:var(--soft);color:var(--muted)}
+  #wp-root .dtl{list-style:none;margin:0;padding:0;font-size:12.5px}
+  #wp-root .dtl li{display:flex;gap:10px;padding:3px 4px}
+  #wp-root .dtl .dtd{color:var(--muted);font-variant-numeric:tabular-nums;flex:none;min-width:78px}
+  #wp-root .wp-modal-f{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+  #wp-root .wp-modal-f:empty{display:none}
+  @media print{ #wp-root .wp-modal-ov,#wp-root .wp-modal{display:none!important} }
+  #wp-root .admbox{margin-top:16px;padding-top:12px;border-top:2px dashed var(--line)}
+  #wp-root .admbox h4{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--amber);margin:12px 0 6px}
+  #wp-root .admgrid{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+  #wp-root .admf{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+  #wp-root .admf input,#wp-root .admbox select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--fg)}
+  #wp-root .admchips{display:flex;flex-wrap:wrap;gap:6px}
+  #wp-root .admchip{font:inherit;font-size:12px;padding:4px 10px;border:1px solid var(--line);border-radius:20px;background:#fff;color:var(--fg);cursor:pointer}
+  #wp-root .admchip:hover{background:var(--soft)}
+  #wp-root .admchip.on{background:var(--okbg);border-color:var(--c-vergeben);color:var(--ok);font-weight:600}
+  @media print{ #wp-root .admbox{display:none!important} }
+  #wp-root .wp-errbar,#wp-root .wp-warnbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;border-radius:var(--r);padding:9px 14px;margin:0 auto 12px;max-width:920px;font-size:13px}
+  #wp-root .wp-errbar{background:var(--dangerbg);border:1px solid var(--danger);color:var(--danger)}
+  #wp-root .wp-warnbar{background:var(--amberbg);border:1px solid var(--amber);color:var(--amber)}
+  #wp-root .wp-errbar .txt,#wp-root .wp-warnbar .txt{flex:1;min-width:200px}
+  #wp-root.wp-ro .acts,#wp-root.wp-ro .iacts,#wp-root.wp-ro .wp-modal-f,#wp-root.wp-ro .admbox,#wp-root.wp-ro #addbtn,#wp-root.wp-ro #gcard,#wp-root.wp-ro #cleanbtn,#wp-root.wp-ro #resetbtn{display:none!important}
+  #wp-root.wp-guest .acts,#wp-root.wp-guest .iacts,#wp-root.wp-guest .wp-modal-f,#wp-root.wp-guest #addbtn,#wp-root.wp-guest #gcard,#wp-root.wp-guest #myreq{display:none!important}
+  #wp-root .wp-foot{color:var(--muted);font-size:11px;text-align:center;margin:8px 0 0}
+  #wp-root .dstbl{width:100%;border-collapse:collapse;font-size:12px}
+  #wp-root .dstbl th,#wp-root .dstbl td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
+  #wp-root .dstbl tr.cur td{font-weight:600;color:var(--ok)}
+  #wp-root .dstbl tr.bad td{color:var(--danger)}
+  @media print{ #wp-root .wp-errbar,#wp-root .wp-warnbar,#wp-root .wp-foot{display:none!important} }
 `;var __SHELL=`
   <div class="hint-green">Schnick-Schnack-Schuck um die Wochenendpräsenz! Du weißt nicht, wie man spielt? <a href="#wp-anleitung">Hier zur Spielanleitung.</a></div>
 
@@ -193,7 +192,8 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
   <div class="card noprint" id="selftest2card" style="display:none"><h2>Selbsttest — Unit &amp; Integration</h2><div class="bar" style="margin:0 0 8px"><button class="btn" id="selftestbtn">Selbsttest starten</button><span class="muted">Testet mit Beispieldaten, ändert nichts am echten Stand.</span></div><div class="diag" id="selftest2"></div></div>
   <div class="card noprint" id="dscard" style="display:none"><h2>Datenstände (Admin)</h2><div class="muted">Gespeicherte Generationen (die letzten 10 bleiben als Historie). Ein älterer Stand wird als <b>neue</b> Generation wiederhergestellt; nichts wird gelöscht.</div><div class="bar" style="margin:8px 0"><button class="btn sm" id="dsload">Datenstände anzeigen</button></div><div id="dslist"></div></div>
   <div class="card guide" id="wp-anleitung"><h2>Anleitung</h2><div class="sum">Trag deinen zu vertretenden Dienst über „+ Gesuch" ein. Als Poolmitglied markierst du bei passenden Terminen „kann"; das System schlägt fair vor, wer als Nächstes dran ist. Mit „zusagen" übernimmst du verbindlich, mit „Nicht ich – weitergeben" reichst du an die/den Nächste(n) weiter. Ganz oben siehst du deine eigenen Gesuche, in der Inbox was für dich zu tun ist, in der Liste den Gesamtüberblick.</div><details><summary>… mehr Details</summary><h4>Worum geht es</h4><p>Die Liste verteilt Vertretungen für Wochenend- und Feiertagsdienste. Du entscheidest immer selbst — das System macht nur faire Vorschläge.</p><h4>Wenn du selbst eine Vertretung suchst</h4><ul><li>Öffne „+ Gesuch", wähle das Datum und trag dich als „Dienst von" ein.</li><li>Im Bereich „Meine Vertretungsgesuche" (ganz oben) siehst du den Status: wie viele Angebote es gibt, ob schon jemand zugesagt hat und ab wann mit einer Zusage zu rechnen ist.</li><li>Brauchst du keine Vertretung mehr: „zurückziehen". Tut sich nichts: „Pool erinnern".</li></ul><h4>Wenn du Dienste übernehmen kannst (Pool)</h4><ul><li>Markiere bei jedem Termin, den du übernehmen könntest, „kann".</li><li>Das System schlägt unter allen, die „kann" markiert haben, die Person mit den wenigsten bisher übernommenen Diensten im laufenden Jahr vor.</li><li>Stehst du im „Vorschlag für dich", kannst du mit „zusagen" verbindlich übernehmen — oder „Nicht ich – weitergeben", dann rückt der Vorschlag zur/zum Nächsten.</li></ul><h4>Gleichstand</h4><p>Haben mehrere gleich wenige Dienste, wird fair zufällig eine Person vorgeschlagen; die anderen werden als „gleichauf" mit genannt, damit ihr euch absprechen könnt, für wen es am besten passt.</p><h4>Inbox und Liste</h4><ul><li><b>Inbox</b>: zeigt personalisiert, was gerade für dich ansteht.</li><li><b>Liste</b>: alle Termine chronologisch mit Status; vergangene sind eingeklappt.</li></ul><h4>Status der Termine</h4><ul><li><b>Sammelphase</b>: Pool kann sich melden (bis <span class="cfg-cw"></span> vor dem Termin).</li><li><b>Zusagephase</b>: ab <span class="cfg-cw"></span> vorher — jetzt verbindlich zusagbar.</li><li><b>zugesagt</b>: eine Vertretung steht fest.</li><li><b>kritisch</b>: noch keine Vertretung, Termin in <span class="cfg-cr"></span> oder weniger.</li><li><b>durchgerutscht</b>: vorbei, ohne Vertretung.</li></ul><h4>Fristen (weiche Hinweise)</h4><p>Ablauf je Dienst: Nach dem Eintragen läuft die <b>Sammelphase</b>, in der sich der Pool meldet. <span class="cfg-cw"></span> vor dem Termin beginnt die <b>Zusagephase</b> — erst dann ist eine verbindliche Zusage möglich (vorher zeigt die App „Zusage ab …"). Wird ein Dienst eingetragen, der bereits innerhalb der nächsten <span class="cfg-cw"></span> liegt, entfällt die Sammelphase und er kann sofort zugesagt werden.</p><h4>Löschen</h4><p>Falsch eingetragene Dienste lassen sich löschen, solange sie nicht verbindlich zugesagt sind. Zugesagte Dienste sind final und können nicht mehr gelöscht werden (zuerst „freigeben").</p><h4>Jahresübersicht &amp; Export</h4><p>Im Bereich „Jahresübersicht &amp; Export" wählst du ein Jahr und siehst alle Dienste mit Status kompakt in einer Tabelle. „CSV herunterladen" speichert die Übersicht als Datei (öffnet sich in Excel). Am Ende steht eine kleine Statistik: Gesamtzahl, Aufschlüsselung je Status und ein Ranking der Personen nach zugesagten Diensten.</p><h4>Benachrichtigungen</h4><ul><li>Wer einen Dienst eingetragen hat, wird benachrichtigt, sobald jemand zusagt.</li><li>Die zugesagte Vertretung wird <span class="cfg-ld"></span> vor dem Termin erinnert.</li><li>Offene Termine lassen sich per „Pool erinnern" in Erinnerung rufen.</li></ul></details></div>
-  <div class="wp-foot" id="wp-foot"></div>`;function injectStyle(){var s=document.createElement("style");s.textContent=__CSS;document.head.appendChild(s);}function buildShell(){var r=document.getElementById("wp-root");if(!r){r=document.createElement("div");r.id="wp-root";document.body.appendChild(r);}r.innerHTML=__SHELL;}function getPageId(){if(window.AJS){if(AJS.Meta){var v=AJS.Meta.get("page-id");if(v)return v;}if(AJS.params&&AJS.params.pageId)return AJS.params.pageId;}var m=document.querySelector('meta[name="ajs-page-id"]');return m?m.getAttribute("content"):"";}function getCtx(){return (window.AJS&&AJS.contextPath)?AJS.contextPath():"";}var PID=getPageId(),CTX=getCtx(),IS_CONF=!!PID,__members=null,curName=null;function showError(e){var msg=(e&&e.message)?e.message:String(e);if(window.console)console.error("[WP]",e);var host=document.getElementById("wp-root")||document.body;var b=document.getElementById("wp-err");if(!b){b=document.createElement("div");b.id="wp-err";b.style.cssText="background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif";host.insertBefore(b,host.firstChild);}b.textContent="Fehler: "+msg+" (403=Rechte,404=Pfad,409=Version,413=zu groß)";}function showInfo(d){var host=document.getElementById("wp-root")||document.body;var b=document.createElement("div");b.style.cssText="background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;color:#1f5132";var msg="Erst-Import aus seed.json: "+d.members+" Mitglieder aus Gruppe \""+GROUP+"\", "+d.bestMapped+"/"+d.bestSeed+" Zusagen uebernommen, "+d.kannMapped+"/"+d.kannSeed+" kann uebernommen.";if(d.bestSeed===0){msg+=" ACHTUNG: seed.json enthaelt keine Zusagen - vermutlich veralteter Anhang.";}else if(d.bestMapped===0){msg+=" ACHTUNG: keine Zusage zugeordnet - Namen passen nicht zur Gruppe.";}if(d.unmapped&&d.unmapped.length){msg+=" Nicht zugeordnet: "+d.unmapped.join(", ")+".";}b.textContent=msg;host.insertBefore(b,host.firstChild);}function jget(p){return fetch(CTX+p,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("GET "+p+" -> "+r.status);return r.json();});}function share(p){return fetch(CTX+"/rest/share-page/latest/share",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(p)}).then(function(r){if(!r.ok)throw new Error("share-page -> "+r.status);return true;});}function shareUsers(u,note){return share({users:u,emails:[],groups:[],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function shareGroup(g,note){return share({users:[],emails:[],groups:[g],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  <div class="wp-foot" id="wp-foot"></div>`;// Alle Regeln sind auf #wp-root begrenzt (kein Einfluss auf das Confluence-Layout). Nur im lokalen Modus (eigene Seite) wird body gestaltet.
+var __CSS_LOCAL="body{margin:0;background:#f4f5f7;padding:20px}@media print{@page{size:A4 landscape;margin:12mm}body{background:#fff;padding:0}}";function injectStyle(){var s=document.createElement("style");s.textContent=__CSS+(IS_CONF?"":__CSS_LOCAL);document.head.appendChild(s);}function buildShell(){var r=document.getElementById("wp-root");if(!r){r=document.createElement("div");r.id="wp-root";document.body.appendChild(r);}r.innerHTML=__SHELL;}function getPageId(){if(window.AJS){if(AJS.Meta){var v=AJS.Meta.get("page-id");if(v)return v;}if(AJS.params&&AJS.params.pageId)return AJS.params.pageId;}var m=document.querySelector('meta[name="ajs-page-id"]');return m?m.getAttribute("content"):"";}function getCtx(){return (window.AJS&&AJS.contextPath)?AJS.contextPath():"";}var PID=getPageId(),CTX=getCtx(),IS_CONF=!!PID,__members=null,curName=null;function showError(e){var msg=(e&&e.message)?e.message:String(e);if(window.console)console.error("[WP]",e);var host=document.getElementById("wp-root")||document.body;var b=document.getElementById("wp-err");if(!b){b=document.createElement("div");b.id="wp-err";b.style.cssText="background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif";host.insertBefore(b,host.firstChild);}b.textContent="Fehler: "+msg+" (403=Rechte,404=Pfad,409=Version,413=zu groß)";}function showInfo(d){var host=document.getElementById("wp-root")||document.body;var b=document.createElement("div");b.style.cssText="background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;color:#1f5132";var msg="Erst-Import aus seed.json: "+d.members+" Mitglieder aus Gruppe \""+GROUP+"\", "+d.bestMapped+"/"+d.bestSeed+" Zusagen uebernommen, "+d.kannMapped+"/"+d.kannSeed+" kann uebernommen.";if(d.bestSeed===0){msg+=" ACHTUNG: seed.json enthaelt keine Zusagen - vermutlich veralteter Anhang.";}else if(d.bestMapped===0){msg+=" ACHTUNG: keine Zusage zugeordnet - Namen passen nicht zur Gruppe.";}if(d.unmapped&&d.unmapped.length){msg+=" Nicht zugeordnet: "+d.unmapped.join(", ")+".";}b.textContent=msg;host.insertBefore(b,host.firstChild);}function jget(p){return fetch(CTX+p,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("GET "+p+" -> "+r.status);return r.json();});}function share(p){return fetch(CTX+"/rest/share-page/latest/share",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(p)}).then(function(r){if(!r.ok)throw new Error("share-page -> "+r.status);return true;});}function shareUsers(u,note){return share({users:u,emails:[],groups:[],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function shareGroup(g,note){return share({users:[],emails:[],groups:[g],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 /* ============================================================
    Sprint 2b — Activity-Stream-Sichtbarkeit ueber unsichtbaren
    Seiten-Marker (Anchor-Makro mit hochzaehlender Nummer).

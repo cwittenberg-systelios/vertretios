@@ -25,6 +25,9 @@ module.exports = function () {
 
   ok("app.js: Engine-Selbsttest (save/load-Roundtrip) läuft nie gegen Confluence", /function selftest\(\)\{if\(!SEED\|\|IS_CONF\)\{/.test(app));
   ok("app.js: Nicht-Mitglieder nur Ansicht (isGuest, kein ungeschütztes byId[cur].name)", /function isGuest\(\)/.test(app) && (app.match(/byId\[cur\]\.name/g) || []).length === 1 && /function anlegen\(\)\{if\(isGuest\(\)\)return;/.test(app) && /function runDueReminders\(\)\{if\(isGuest\(\)\)return;/.test(app));
+  var cssSrc = app.slice(app.indexOf("var __CSS=`") + 11, app.indexOf("`;var __SHELL")).replace(/\/\*[^]*?\*\//g, "").replace(/@media[^{]*\{/g, "");
+  var unscoped = []; cssSrc.replace(/(^|\})\s*([^{}]+)\{/g, function (_, x, sel) { sel.split(",").forEach(function (p) { if (!/^\s*#wp-root/.test(p)) unscoped.push(p.trim()); }); });
+  ok("app.js: CSS vollständig auf #wp-root begrenzt (kein body/*/h1/:root/@page im Confluence-Layout)", unscoped.length === 0 && !/@page/.test(cssSrc), unscoped.join(" | "));
   ok("htmlMacro: lädt persistence.js vor app.js", /\["persistence\.js", "app\.js"\]/.test(macro));
   ok("htmlMacro: kein eigenes Cache-Busting (Confluence versioniert Anhänge)", !/Date\.now\(\)/.test(macro) && !/\?v=/.test(macro));
   ok("htmlMacro: kein CDATA / keine Velocity-$", !/CDATA/.test(macro) && !/\$[a-zA-Z{]/.test(macro));
