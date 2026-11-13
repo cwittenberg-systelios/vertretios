@@ -74,6 +74,13 @@ var me = { current: { userKey: "carsten", username: "carsten", displayName: "Car
     ok("E2E: Laden schreibt nichts", JSON.stringify(env.mt.store) === before);
     ok("E2E: Skripte ohne ?v= geladen, persistence.js zuerst", env.scriptHits.length === 2 && /persistence\.js$/.test(env.scriptHits[0]) && /app\.js$/.test(env.scriptHits[1]));
     ok("E2E: Build-Version im Fuß", /Build dev/.test(await pg.locator("#wp-foot").innerText()));
+    ok("E2E: Engine-Selbsttest-Karte in Confluence ausgeblendet", !(await pg.locator("#diagcard").isVisible()));
+    var w0st = env.mt.writes;
+    await pg.locator("#selftestbtn").click();
+    await pg.waitForFunction(function () { var e = document.getElementById("selftest2"); return e && /Alle Tests gruen|Rote Tests/.test(e.innerText); }, null, { timeout: 8000 }).catch(function () {});
+    var st2 = await pg.locator("#selftest2").innerText();
+    ok("E2E: In-App-Selbsttest (Admin) komplett grün, inkl. Sortierung + Regeln", /^Alle Tests gruen/.test(st2) && /Sortierung \(\d+\/\d+\)/.test(st2) && /Regeln \(\d+\/\d+\)/.test(st2), st2.split("\n").filter(function (l) { return /\u2717/.test(l); }).join(" | "));
+    ok("E2E: Selbsttest schreibt nichts", env.mt.writes === w0st);
     // 2) Änderung -> Migration beim ersten Speichern
     await pg.locator('#future .row [data-act="kann"]').first().click();
     await pg.waitForFunction(function () { return true; });
