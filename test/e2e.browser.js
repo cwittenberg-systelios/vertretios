@@ -4,7 +4,9 @@
  * Startet einen lokalen Fake-Confluence (Content Properties, Anhänge, User/Gruppe, Seite) auf
  * Basis von test/helpers.js, lädt htmlMacro.html + persistence.js + app.js und prüft:
  * Migration aus dem Live-Format wpstore v2, Speichern, Speicherfehler-Banner, Schreibschutz bei
- * Ladefehler, Admin-Datenstände + Wiederherstellung, Unload ohne Datenverlust, Build-Version im Fuß. */
+ * Ladefehler, Admin-Datenstände + Wiederherstellung, Unload ohne Datenverlust, Build-Version im Fuß,
+ * Nicht-Mitglied (nur Ansicht), zwei Nutzer mit veraltetem Tab (kann/Zusage), Auto-Aktualisierung,
+ * Escaping, ausgeschiedene Vertretung, Mails erst nach erfolgreichem Speichern. */
 "use strict";
 var http = require("http"), fs = require("fs"), path = require("path");
 var H = require("./helpers"), P = require("../persistence.js");
@@ -39,6 +41,7 @@ function serve(env, me) {
       }
       if (p === "/rest/api/user/current") return send(200, JSON.stringify(me.current));
       if (/^\/rest\/api\/group\/.+\/member$/.test(p)) return send(200, JSON.stringify({ results: me.members }));
+      if (p === "/rest/share-page/latest/share") { env.shares.push(JSON.parse(body || "{}")); return send(200, "{}"); }
       if (p === "/rest/api/content/" + PID && rq.method === "GET") return send(200, JSON.stringify({ id: PID, title: "T", space: { key: "S" }, version: { number: 1 }, body: { storage: { value: "" } } }));
       if (p === "/rest/api/content/" + PID && rq.method === "PUT") return send(200, "{}");
       if (env.failGet && env.failGet.test(p) && rq.method === "GET") return send(500, "{}");
@@ -52,7 +55,7 @@ var me = { current: { userKey: "carsten", username: "carsten", displayName: "Car
   members: [{ userKey: "carsten", username: "carsten", displayName: "Carsten W" }, { userKey: "anna", username: "anna", displayName: "Anna A" }, { userKey: "bert", username: "bert", displayName: "Bert B" }] };
 
 (async function () {
-  var env = setup(); env.scriptHits = [];
+  var env = setup(); env.scriptHits = []; env.shares = [];
   var srv = serve(env, me); await new Promise(function (r) { srv.listen(0, r); });
   var base = "http://127.0.0.1:" + srv.address().port + "/";
   var browser = await pw.chromium.launch({ executablePath: process.env.CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
@@ -74,7 +77,7 @@ var me = { current: { userKey: "carsten", username: "carsten", displayName: "Car
     ok("E2E: Laden schreibt nichts", JSON.stringify(env.mt.store) === before);
     ok("E2E: Skripte ohne ?v= geladen, persistence.js zuerst", env.scriptHits.length === 2 && /persistence\.js$/.test(env.scriptHits[0]) && /app\.js$/.test(env.scriptHits[1]));
     ok("E2E: Build-Version im Fuß", /Build dev/.test(await pg.locator("#wp-foot").innerText()));
-    ok("E2E: Engine-Selbsttest-Karte in Confluence ausgeblendet", !(await pg.locator("#diagcard").isVisible()));
+    ok("E2E: alter Engine-Selbsttest entfernt", (await pg.locator("#diagcard").count()) === 0);
     var w0st = env.mt.writes;
     await pg.locator("#selftestbtn").click();
     await pg.waitForFunction(function () { var e = document.getElementById("selftest2"); return e && /Alle Tests gruen|Rote Tests/.test(e.innerText); }, null, { timeout: 8000 }).catch(function () {});
@@ -139,6 +142,63 @@ var me = { current: { userKey: "carsten", username: "carsten", displayName: "Car
     var G7 = new P.Store(env.mt); var m7 = await G7.load();
     ok("E2E Gast: erzwungene Klicks ändern und speichern nichts", env.mt.writes === w7 && m7.requests.length === 2 && (await pg7.locator("#future .row").count()) === 2);
     me.current = meSave; await pg7.close();
+    // ---- ab hier: mehrere Nutzer ----
+    var U = { carsten: me.members[0], anna: me.members[1], bert: me.members[2] };
+    function iso(n) { var d = new Date(); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+    function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    async function stored() { var S = new P.Store(env.mt); return await S.load(); }
+    function byId(m, id) { return m.requests.filter(function (x) { return x.id === id; })[0]; }
+    async function openAs(u) { me.current = U[u]; var p = await open(); return p; }
+    // 8) Veralteter Tab: Bert und Anna klicken nacheinander "kann" -> beide bleiben
+    var pa = await openAs("anna"), pb = await openAs("bert");
+    await pb.locator('#future .row [data-act="kann"]').nth(1).click(); await wait(3000);
+    await pa.locator('#future .row [data-act="kann"]').nth(1).click(); await wait(3500);
+    var k8 = byId(await stored(), "r2").kann;
+    ok("E2E 2 Nutzer: kann aus veraltetem Tab überschreibt fremdes kann nicht", k8.indexOf("anna") >= 0 && k8.indexOf("bert") >= 0, JSON.stringify(k8));
+    ok("E2E: Mitglieder werden nicht mitgespeichert", (await stored()).members.length === 0);
+    // 8b) Auto-Aktualisierung: Berts Tab ist jetzt veraltet und hat nichts offen -> lädt beim Prüfen selbst nach
+    await pb.evaluate(function () { document.dispatchEvent(new Event("visibilitychange")); }); await wait(2000);
+    ok("E2E: unbeschäftigter Tab aktualisiert sich selbst (ohne Banner-Klick)", (await pb.locator('#future .row').nth(1).innerHTML()).indexOf('title="Anna A') >= 0 && !(await pb.locator("#wp-update").isVisible().catch(function () { return false; })));
+    await pa.close(); await pb.close();
+    // 9) Zusage aus veraltetem Tab ersetzt fremde Zusage nicht; genau eine Benachrichtigung
+    var pc = await openAs("carsten");
+    await pc.locator("#addbtn").click(); await pc.fill("#g-date", iso(10)); await pc.fill("#g-name", "Carsten W"); await pc.locator("#savebtn").click(); await wait(3000);
+    var pa2 = await openAs("anna"), pb2 = await openAs("bert"), sh0 = env.shares.length;
+    await pb2.locator('#future .row [data-act="ueb"]').first().click(); await wait(3000);
+    await pa2.locator('#future .row [data-act="ueb"]').first().click(); await wait(3500);
+    var m9 = await stored(), r9 = m9.requests.filter(function (x) { return x.date === iso(10); })[0];
+    ok("E2E 2 Nutzer: Zusage aus veraltetem Tab ersetzt fremde Zusage nicht", !!r9 && r9.best === "bert", r9 && r9.best);
+    ok("E2E 2 Nutzer: nur eine Zusage-Mail (an den Ersteller)", env.shares.length === sh0 + 1 && env.shares[sh0].users[0] === "carsten", JSON.stringify(env.shares.slice(sh0)));
+    ok("E2E 2 Nutzer: Verliererin sieht Hinweis und den echten Stand", /nicht übernommen/.test(await pa2.locator("#wp-msgs").innerText().catch(function () { return ""; })) && /Vertretung: Bert B/.test(await pa2.locator("#future .row").first().innerText()));
+    await pa2.locator("#wp-msgs button").first().click();
+    ok("E2E: Hinweis lässt sich schließen", (await pa2.locator("#wp-msgs > div").count()) === 0);
+    await pa2.close(); await pb2.close();
+    // 10) Escaping: HTML im Freitext "Dienst von" wird nicht ausgeführt
+    await pc.locator("#addbtn").click(); await pc.fill("#g-date", iso(40)); await pc.fill("#g-name", '<img src=x onerror="window.__xss=1">'); await pc.locator("#savebtn").click(); await wait(3000);
+    await pc.close();
+    var px = await openAs("anna"); await px.evaluate(function () { document.getElementById("tab-a").click(); }); await wait(300);
+    await px.evaluate(function () { document.getElementById("tab-c").click(); var d = document.querySelector('#future [data-detail]'); if (d) d.click(); }); await wait(300);
+    ok("E2E: HTML in 'Dienst von' wird nicht ausgeführt", (await px.evaluate(function () { return window.__xss; })) === undefined && (await px.locator("#future img").count()) === 0 && (await stored()).requests.some(function (x) { return /<img/.test(x.dienstVon); }));
+    await px.close();
+    // 11) Ausgeschiedene Vertretung + fällige Erinnerung; Mail erst nach erfolgreichem Speichern
+    var S11 = new P.Store(env.mt); await S11.load();
+    S11.apply(function (m) {
+      m.requests.push({ id: "dep", date: iso(2), dienstVon: "Anna A", dienstVonUser: "anna", eintragVom: iso(-9), kann: ["weg"], best: "weg", passed: [], remindedAt: null, confirmNotifiedAt: iso(-3), bestAt: iso(-3) });
+      m.requests.push({ id: "due", date: iso(1), dienstVon: "Anna A", dienstVonUser: "anna", eintragVom: iso(-9), kann: ["bert"], best: "bert", passed: [], remindedAt: null, confirmNotifiedAt: iso(-3), bestAt: iso(-3) });
+      return m;
+    });
+    await S11.persist();
+    env.mt.failPutMatching = /^vertretios\.store-/; var sh1 = env.shares.length;
+    var pd = await openAs("carsten"); await wait(3500);
+    ok("E2E: ausgeschiedene Vertretung legt die App nicht lahm", (await pd.locator("#wp-loaderr").count()) === 0 && (await pd.locator("#future .row").count()) >= 4 && !(await pd.evaluate(function () { return document.getElementById("wp-root").classList.contains("wp-ro"); })));
+    ok("E2E: Speichern fehlgeschlagen -> keine Erinnerungs-Mail", env.shares.length === sh1 && await pd.locator("#wp-saveerr").isVisible().catch(function () { return false; }));
+    env.mt.failPutMatching = null;
+    await pd.locator('#wp-saveerr [data-status-act="retry"]').click(); await wait(3000);
+    var m11 = await stored();
+    ok("E2E: nach erfolgreichem Speichern genau eine Erinnerung an die Vertretung", env.shares.length === sh1 + 1 && env.shares[sh1].users[0] === "bert" && byId(m11, "due").remindedAt === iso(0) && !byId(m11, "dep").remindedAt, JSON.stringify(env.shares.slice(sh1)));
+    var pe = await openAs("anna"); await wait(2500);
+    ok("E2E: zweiter Seitenaufruf verschickt die Erinnerung nicht erneut", env.shares.length === sh1 + 1);
+    await pd.close(); await pe.close();
     ok("E2E: keine JS-Fehler", errors.length === 0, errors.join(" | "));
   } catch (e) { console.error(e); ok("E2E ohne Ausnahme", false, String(e)); }
   await browser.close(); srv.close();

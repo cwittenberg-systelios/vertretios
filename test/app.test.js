@@ -23,7 +23,14 @@ module.exports = function () {
   ok("app.js: Admin-Datenstände + Wiederherstellung", /id="dscard"/.test(app) && /function renderDataStates\(\)/.test(app) && /storage\.restore\(row\)/.test(app) && /if\(!isAdmin\(\)\)/.test(app));
   ok("app.js: Build-Version-Platzhalter + Anzeige im Fuß/Konsole", /var BUILD_VERSION="__BUILD_VERSION__"/.test(app) && /"Build "\+BUILD_VERSION/.test(app) && /console\.log\("\[WP\] Vertretungspool Build "/.test(app));
 
-  ok("app.js: Engine-Selbsttest (save/load-Roundtrip) läuft nie gegen Confluence", /function selftest\(\)\{if\(!SEED\|\|IS_CONF\)\{/.test(app));
+  ok("app.js: alter Engine-Selbsttest (speicherte bei jedem Render) entfernt", !/function selftest\(\)/.test(app) && !/id="diagcard"/.test(app));
+  ok("app.js: kein synchrones XHR mehr (Feed-Bump asynchron)", !/XMLHttpRequest/.test(app) && !/function sxJson\(/.test(app));
+  ok("app.js: toter Code entfernt (RestStore, setStatus, doSave)", !/function (RestStore|setStatus|doSave)\(/.test(app));
+  ok("app.js: Mails erst nach dem Speichern (Postausgang), kein Direktversand in den Aktionen", /function flushOutbox\(/.test(app) && (app.match(/shareUsers\(/g) || []).length === 2 && (app.match(/shareGroup\(/g) || []).length === 2);
+  ok("app.js: semantisches Replay (Mengen-Delta, Konfliktliste)", /SET_FIELDS=\{kann:1,passed:1\}/.test(app) && /replay\.conflicts=conflicts/.test(app));
+  ok("app.js: Mitglieder werden nicht mitgespeichert", /local\.members=\[\]/.test(app));
+  var raw = app.slice(app.indexOf("function inboxCard("), app.indexOf("function selftest2("));
+  ok("app.js: Render-Funktionen geben Daten nur über esc()/nameOf aus", !/\+\(?r\.dienstVon\|\|"—"\)?\+/.test(raw) && !/data-id="'\+r\.id\+/.test(raw) && !/byId\[[a-z.]+\]\.name/.test(raw.replace(/sugText[^]*?\}\)/, "")));
   ok("app.js: Nicht-Mitglieder nur Ansicht (isGuest, kein ungeschütztes byId[cur].name)", /function isGuest\(\)/.test(app) && (app.match(/byId\[cur\]\.name/g) || []).length === 1 && /function anlegen\(\)\{if\(isGuest\(\)\)return;/.test(app) && /function runDueReminders\(\)\{if\(isGuest\(\)\)return;/.test(app));
   var cssSrc = app.slice(app.indexOf("var __CSS=`") + 11, app.indexOf("`;var __SHELL")).replace(/\/\*[^]*?\*\//g, "").replace(/@media[^{]*\{/g, "");
   var unscoped = []; cssSrc.replace(/(^|\})\s*([^{}]+)\{/g, function (_, x, sel) { sel.split(",").forEach(function (p) { if (!/^\s*#wp-root/.test(p)) unscoped.push(p.trim()); }); });

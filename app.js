@@ -12,6 +12,18 @@ function isMember(){return !!byId[cur];}
 function isGuest(){return !isMember()&&!isAdmin();}
 function meName(){return (byId[cur]&&byId[cur].name)||curName||String(cur||"");}
 function needMember(){if(isMember())return true;alert("Nur Mitglieder des Vertretungspools (Gruppe \u201e"+GROUP+"\u201c) k\u00f6nnen sich selbst eintragen. Als Admin bitte im Detail-Dialog zuweisen.");return false;}
+// ---- kleine Helfer (eine Stelle statt vieler Kopien) ----
+function rootEl(){return document.getElementById("wp-root")||document.body;}
+function nameOf(id){var m=byId[id];return (m&&m.name)||String(id==null?"":id);}
+function setModel(m){model=m;byId={};(model.members||[]).forEach(function(x){byId[x.id]=x;});}
+function membersSorted(){return model.members.slice().sort(function(a,b){return a.order-b.order;});}
+function memberByName(nm){var k=String(nm||"").toLowerCase();for(var i=0;i<model.members.length;i++){if(String(model.members[i].name).toLowerCase()===k)return model.members[i];}return null;}
+function dropPassed(r,uid){if(!r.passed)return;var i=r.passed.indexOf(uid);if(i>=0)r.passed.splice(i,1);}
+function inDays(n){return n===0?"heute":(n===1?"morgen":"in "+n+" Tagen");}
+function byDateAsc(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);}
+function futureReqs(){return model.requests.filter(function(r){return r.date>=todayIso;}).sort(byDateAsc);}
+function pastReqs(){return model.requests.filter(function(r){return r.date<todayIso;}).sort(function(a,b){return byDateAsc(b,a);});}
+function newId(){return "n"+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)return false;return isOwner(r);}var __importDiag=null;var __CSS=`
   #wp-root{
     --fg:#172b4d;--muted:#5e6c84;--line:#dfe1e6;--bg:#fff;--border:#dfe1e6;--soft:#f4f5f7;--r:6px;
@@ -22,10 +34,6 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
   }
   #wp-root,#wp-root *{box-sizing:border-box}
   #wp-root{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg)}
-  #wp-root .wrap{max-width:920px;margin:0 auto}
-  #wp-root h1{font-size:20px;font-weight:600;margin:0 0 2px}
-  #wp-root .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
-  #wp-root .printhead{display:none}
   #wp-root .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
   #wp-root .bar .grow{flex:1}
   #wp-root label.id{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
@@ -94,11 +102,7 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
   #wp-root .tline:before,#wp-root .tline:after{content:"";height:1px;background:var(--danger);opacity:.35;flex:1}
   @media print{
     #wp-root{font-size:12px}
-    #wp-root .wrap{max-width:none}
     #wp-root .bar,#wp-root .gform,#wp-root .acts,#wp-root .iacts,#wp-root .noprint,#wp-root .tline,#wp-root .log,#wp-root .diag,#wp-root details summary,#wp-root .pastbar{display:none!important}
-    #wp-root .printhead{display:flex!important;align-items:flex-end;justify-content:space-between;border-bottom:2px solid var(--fg);padding-bottom:6px;margin-bottom:10px}
-    #wp-root .printhead .logo{border:1px dashed var(--muted);color:var(--muted);font-size:11px;padding:10px 16px;border-radius:4px}
-    #wp-root h1,#wp-root .sub{display:none}
     #wp-root .row,#wp-root .icard{break-inside:avoid}
     #wp-root .rright{display:none}
     #wp-root details{display:block!important}
@@ -159,7 +163,7 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
   #wp-root .dstbl th,#wp-root .dstbl td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line)}
   #wp-root .dstbl tr.cur td{font-weight:600;color:var(--ok)}
   #wp-root .dstbl tr.bad td{color:var(--danger)}
-  @media print{ #wp-root .wp-errbar,#wp-root .wp-warnbar,#wp-root .wp-foot{display:none!important} }
+  @media print{ #wp-root .wp-errbar,#wp-root .wp-warnbar,#wp-root .wp-foot,#wp-root #wp-msgs{display:none!important} }
 `;var __SHELL=`
   <div class="hint-green">Schnick-Schnack-Schuck um die Wochenendpräsenz! Du weißt nicht, wie man spielt? <a href="#wp-anleitung">Hier zur Spielanleitung.</a></div>
 
@@ -185,21 +189,33 @@ function canDelete(r){if(!r)return false;if(isAdmin())return true;if(r.best)retu
 
   
   <div class="card"><h2>Bisher übernommen — laufendes Jahr <span id="cy"></span> (grün = wenigste, umrandet = du)</h2><div class="chips" id="counts"></div></div>
-  <div class="card noprint" id="cfgcard" style="display:none"><h2>Regeln (Admin)</h2><div class="gform open"><div class="f">Zusage ab … Tagen vorher<input type="number" id="cfg-cwin" min="1" max="90"></div><div class="f">Kritisch ab … Tagen vorher<input type="number" id="cfg-crit" min="0" max="90"></div><div class="f">Erinnerung Vertretung … Tage vorher<input type="number" id="cfg-lead" min="0" max="30"></div><button class="btn prim" id="cfg-save">Regeln speichern</button></div><div class="ghint" id="cfg-hint"></div></div>
-  <div class="card"><details><summary><h2 style="display:inline-block;margin:0">Jahresübersicht &amp; Export</h2></summary><div class="bar" style="margin:8px 0"><label>Jahr <select id="exp-year"></select></label><button class="btn" id="exp-csv">CSV herunterladen</button></div><div id="exp-table"></div></details></div>
+  <div class="card noprint" id="cfgcard" style="display:none"><h2>Regeln (Admin)</h2><div class="gform open"><div class="f">Zusage ab … Tagen vorher<input type="number" id="cfg-cwin"></div><div class="f">Kritisch ab … Tagen vorher<input type="number" id="cfg-crit"></div><div class="f">Erinnerung Vertretung … Tage vorher<input type="number" id="cfg-lead"></div><button class="btn prim" id="cfg-save">Regeln speichern</button></div><div class="ghint" id="cfg-hint"></div></div>
+  <div class="card"><details id="exp-details"><summary><h2 style="display:inline-block;margin:0">Jahresübersicht &amp; Export</h2></summary><div class="bar" style="margin:8px 0"><label>Jahr <select id="exp-year"></select></label><button class="btn" id="exp-csv">CSV herunterladen</button></div><div id="exp-table"></div></details></div>
   <div class="card noprint"><h2>Aktivität / Protokoll (rot = Override; [STUB] = Teilen-Benachrichtigung)</h2><div class="log" id="log"></div></div>
-  <div class="card noprint" id="diagcard"><h2>Selbsttest (Engine & Live-Invarianten)</h2><div class="diag" id="diag"></div></div>
   <div class="card noprint" id="selftest2card" style="display:none"><h2>Selbsttest — Unit &amp; Integration</h2><div class="bar" style="margin:0 0 8px"><button class="btn" id="selftestbtn">Selbsttest starten</button><span class="muted">Testet mit Beispieldaten, ändert nichts am echten Stand.</span></div><div class="diag" id="selftest2"></div></div>
   <div class="card noprint" id="dscard" style="display:none"><h2>Datenstände (Admin)</h2><div class="muted">Gespeicherte Generationen (die letzten 10 bleiben als Historie). Ein älterer Stand wird als <b>neue</b> Generation wiederhergestellt; nichts wird gelöscht.</div><div class="bar" style="margin:8px 0"><button class="btn sm" id="dsload">Datenstände anzeigen</button></div><div id="dslist"></div></div>
   <div class="card guide" id="wp-anleitung"><h2>Anleitung</h2><div class="sum">Trag deinen zu vertretenden Dienst über „+ Gesuch" ein. Als Poolmitglied markierst du bei passenden Terminen „kann"; das System schlägt fair vor, wer als Nächstes dran ist. Mit „zusagen" übernimmst du verbindlich, mit „Nicht ich – weitergeben" reichst du an die/den Nächste(n) weiter. Ganz oben siehst du deine eigenen Gesuche, in der Inbox was für dich zu tun ist, in der Liste den Gesamtüberblick.</div><details><summary>… mehr Details</summary><h4>Worum geht es</h4><p>Die Liste verteilt Vertretungen für Wochenend- und Feiertagsdienste. Du entscheidest immer selbst — das System macht nur faire Vorschläge.</p><h4>Wenn du selbst eine Vertretung suchst</h4><ul><li>Öffne „+ Gesuch", wähle das Datum und trag dich als „Dienst von" ein.</li><li>Im Bereich „Meine Vertretungsgesuche" (ganz oben) siehst du den Status: wie viele Angebote es gibt, ob schon jemand zugesagt hat und ab wann mit einer Zusage zu rechnen ist.</li><li>Brauchst du keine Vertretung mehr: „zurückziehen". Tut sich nichts: „Pool erinnern".</li></ul><h4>Wenn du Dienste übernehmen kannst (Pool)</h4><ul><li>Markiere bei jedem Termin, den du übernehmen könntest, „kann".</li><li>Das System schlägt unter allen, die „kann" markiert haben, die Person mit den wenigsten bisher übernommenen Diensten im laufenden Jahr vor.</li><li>Stehst du im „Vorschlag für dich", kannst du mit „zusagen" verbindlich übernehmen — oder „Nicht ich – weitergeben", dann rückt der Vorschlag zur/zum Nächsten.</li></ul><h4>Gleichstand</h4><p>Haben mehrere gleich wenige Dienste, wird fair zufällig eine Person vorgeschlagen; die anderen werden als „gleichauf" mit genannt, damit ihr euch absprechen könnt, für wen es am besten passt.</p><h4>Inbox und Liste</h4><ul><li><b>Inbox</b>: zeigt personalisiert, was gerade für dich ansteht.</li><li><b>Liste</b>: alle Termine chronologisch mit Status; vergangene sind eingeklappt.</li></ul><h4>Status der Termine</h4><ul><li><b>Sammelphase</b>: Pool kann sich melden (bis <span class="cfg-cw"></span> vor dem Termin).</li><li><b>Zusagephase</b>: ab <span class="cfg-cw"></span> vorher — jetzt verbindlich zusagbar.</li><li><b>zugesagt</b>: eine Vertretung steht fest.</li><li><b>kritisch</b>: noch keine Vertretung, Termin in <span class="cfg-cr"></span> oder weniger.</li><li><b>durchgerutscht</b>: vorbei, ohne Vertretung.</li></ul><h4>Fristen (weiche Hinweise)</h4><p>Ablauf je Dienst: Nach dem Eintragen läuft die <b>Sammelphase</b>, in der sich der Pool meldet. <span class="cfg-cw"></span> vor dem Termin beginnt die <b>Zusagephase</b> — erst dann ist eine verbindliche Zusage möglich (vorher zeigt die App „Zusage ab …"). Wird ein Dienst eingetragen, der bereits innerhalb der nächsten <span class="cfg-cw"></span> liegt, entfällt die Sammelphase und er kann sofort zugesagt werden.</p><h4>Löschen</h4><p>Falsch eingetragene Dienste lassen sich löschen, solange sie nicht verbindlich zugesagt sind. Zugesagte Dienste sind final und können nicht mehr gelöscht werden (zuerst „freigeben").</p><h4>Jahresübersicht &amp; Export</h4><p>Im Bereich „Jahresübersicht &amp; Export" wählst du ein Jahr und siehst alle Dienste mit Status kompakt in einer Tabelle. „CSV herunterladen" speichert die Übersicht als Datei (öffnet sich in Excel). Am Ende steht eine kleine Statistik: Gesamtzahl, Aufschlüsselung je Status und ein Ranking der Personen nach zugesagten Diensten.</p><h4>Benachrichtigungen</h4><ul><li>Wer einen Dienst eingetragen hat, wird benachrichtigt, sobald jemand zusagt.</li><li>Die zugesagte Vertretung wird <span class="cfg-ld"></span> vor dem Termin erinnert.</li><li>Offene Termine lassen sich per „Pool erinnern" in Erinnerung rufen.</li></ul></details></div>
   <div class="wp-foot" id="wp-foot"></div>`;// Alle Regeln sind auf #wp-root begrenzt (kein Einfluss auf das Confluence-Layout). Nur im lokalen Modus (eigene Seite) wird body gestaltet.
-var __CSS_LOCAL="body{margin:0;background:#f4f5f7;padding:20px}@media print{@page{size:A4 landscape;margin:12mm}body{background:#fff;padding:0}}";function injectStyle(){var s=document.createElement("style");s.textContent=__CSS+(IS_CONF?"":__CSS_LOCAL);document.head.appendChild(s);}function buildShell(){var r=document.getElementById("wp-root");if(!r){r=document.createElement("div");r.id="wp-root";document.body.appendChild(r);}r.innerHTML=__SHELL;}function getPageId(){if(window.AJS){if(AJS.Meta){var v=AJS.Meta.get("page-id");if(v)return v;}if(AJS.params&&AJS.params.pageId)return AJS.params.pageId;}var m=document.querySelector('meta[name="ajs-page-id"]');return m?m.getAttribute("content"):"";}function getCtx(){return (window.AJS&&AJS.contextPath)?AJS.contextPath():"";}var PID=getPageId(),CTX=getCtx(),IS_CONF=!!PID,__members=null,curName=null;function showError(e){var msg=(e&&e.message)?e.message:String(e);if(window.console)console.error("[WP]",e);var host=document.getElementById("wp-root")||document.body;var b=document.getElementById("wp-err");if(!b){b=document.createElement("div");b.id="wp-err";b.style.cssText="background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif";host.insertBefore(b,host.firstChild);}b.textContent="Fehler: "+msg+" (403=Rechte,404=Pfad,409=Version,413=zu groß)";}function showInfo(d){var host=document.getElementById("wp-root")||document.body;var b=document.createElement("div");b.style.cssText="background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;color:#1f5132";var msg="Erst-Import aus seed.json: "+d.members+" Mitglieder aus Gruppe \""+GROUP+"\", "+d.bestMapped+"/"+d.bestSeed+" Zusagen uebernommen, "+d.kannMapped+"/"+d.kannSeed+" kann uebernommen.";if(d.bestSeed===0){msg+=" ACHTUNG: seed.json enthaelt keine Zusagen - vermutlich veralteter Anhang.";}else if(d.bestMapped===0){msg+=" ACHTUNG: keine Zusage zugeordnet - Namen passen nicht zur Gruppe.";}if(d.unmapped&&d.unmapped.length){msg+=" Nicht zugeordnet: "+d.unmapped.join(", ")+".";}b.textContent=msg;host.insertBefore(b,host.firstChild);}function jget(p){return fetch(CTX+p,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("GET "+p+" -> "+r.status);return r.json();});}function share(p){return fetch(CTX+"/rest/share-page/latest/share",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(p)}).then(function(r){if(!r.ok)throw new Error("share-page -> "+r.status);return true;});}function shareUsers(u,note){return share({users:u,emails:[],groups:[],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function shareGroup(g,note){return share({users:[],emails:[],groups:[g],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+var __CSS_LOCAL="body{margin:0;background:#f4f5f7;padding:20px}@media print{@page{size:A4 landscape;margin:12mm}body{background:#fff;padding:0}}";function injectStyle(){var s=document.createElement("style");s.textContent=__CSS+(IS_CONF?"":__CSS_LOCAL);document.head.appendChild(s);}function buildShell(){var r=document.getElementById("wp-root");if(!r){r=document.createElement("div");r.id="wp-root";document.body.appendChild(r);}r.innerHTML=__SHELL;}function getPageId(){if(window.AJS){if(AJS.Meta){var v=AJS.Meta.get("page-id");if(v)return v;}if(AJS.params&&AJS.params.pageId)return AJS.params.pageId;}var m=document.querySelector('meta[name="ajs-page-id"]');return m?m.getAttribute("content"):"";}function getCtx(){return (window.AJS&&AJS.contextPath)?AJS.contextPath():"";}var PID=getPageId(),CTX=getCtx(),IS_CONF=!!PID,__members=null,curName=null;function showBar(msg,kind){
+  var host=rootEl(),box=document.getElementById("wp-msgs");
+  if(!box){box=document.createElement("div");box.id="wp-msgs";host.insertBefore(box,host.firstChild);}
+  for(var i=0;i<box.children.length;i++){if(box.children[i].getAttribute("data-msg")===msg)return;}
+  var b=document.createElement("div");b.setAttribute("data-msg",msg);b.className=(kind==="info"?"wp-msg-info":"wp-msg-err");
+  b.style.cssText=(kind==="info"?"background:#fff7e6;color:#974f0c;border:1px solid #974f0c;":"background:#ffeceb;color:#ae2a19;border:1px solid #ae2a19;")+"border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;display:flex;gap:10px;align-items:flex-start";
+  var t=document.createElement("span");t.style.flex="1";t.textContent=msg;
+  var x=document.createElement("button");x.type="button";x.textContent="\u00d7";x.setAttribute("aria-label","Schlie\u00dfen");x.style.cssText="border:0;background:transparent;color:inherit;font-size:18px;line-height:1;cursor:pointer;padding:0 4px";
+  x.onclick=function(){if(b.parentNode)b.parentNode.removeChild(b);};
+  b.appendChild(t);b.appendChild(x);box.appendChild(b);
+}
+var HTTP_HINT={"401":"nicht angemeldet","403":"keine Berechtigung","404":"nicht gefunden","409":"Versionskonflikt","413":"Daten zu gro\u00df"};
+function showError(e){var msg=(e&&e.message)?e.message:String(e);if(window.console)console.error("[WP]",e);var m=/(?:->|HTTP)\s*(\d{3})\b/.exec(msg),hint=m?HTTP_HINT[m[1]]:"";showBar("Fehler: "+msg+(hint?" ("+hint+")":""),"err");}
+function showNotice(msg){showBar(msg,"info");}function showInfo(d){var host=document.getElementById("wp-root")||document.body;var b=document.createElement("div");b.style.cssText="background:rgb(243,249,244);border:1px solid rgb(145,200,156);border-radius:6px;padding:10px 12px;margin:10px 0;font:13px sans-serif;color:#1f5132";var msg="Erst-Import aus seed.json: "+d.members+" Mitglieder aus Gruppe \""+GROUP+"\", "+d.bestMapped+"/"+d.bestSeed+" Zusagen uebernommen, "+d.kannMapped+"/"+d.kannSeed+" kann uebernommen.";if(d.bestSeed===0){msg+=" ACHTUNG: seed.json enthaelt keine Zusagen - vermutlich veralteter Anhang.";}else if(d.bestMapped===0){msg+=" ACHTUNG: keine Zusage zugeordnet - Namen passen nicht zur Gruppe.";}if(d.unmapped&&d.unmapped.length){msg+=" Nicht zugeordnet: "+d.unmapped.join(", ")+".";}b.textContent=msg;host.insertBefore(b,host.firstChild);}function jget(p){return fetch(CTX+p,{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("GET "+p+" -> "+r.status);return r.json();});}function share(p){return fetch(CTX+"/rest/share-page/latest/share",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(p)}).then(function(r){if(!r.ok)throw new Error("share-page -> "+r.status);return true;});}function shareUsers(u,note){return share({users:u,emails:[],groups:[],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function shareGroup(g,note){return share({users:[],emails:[],groups:[g],note:note,entityId:PID,entityType:"page",contextualPageId:PID});}function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");}
 /* ============================================================
    Sprint 2b — Activity-Stream-Sichtbarkeit ueber unsichtbaren
    Seiten-Marker (Anchor-Makro mit hochzaehlender Nummer).
    Eine echte Seitenversion erzeugt nativ den "Seite geaendert"-
    Eintrag (echter User + Avatar, kein Thirdparty-Endpoint).
-   Throttle + Coalesce + Close-Flush + 409-Retry, fire-and-forget.
+   Throttle + Coalesce + Flush beim Verstecken + 409-Retry, fire-and-forget.
    Der Thirdparty-Endpoint /rest/activities/1.0/ wurde verworfen:
    er validiert die serverseitig aufgeloeste (relative) Avatar-URL
    ("image.url must be an absolute URI"), nicht im Payload loesbar.
@@ -217,12 +233,15 @@ function bumpPut(pg){return {id:PID,type:"page",title:pg.title,space:{key:(pg.sp
 function bumpOnce(){return jget("/rest/api/content/"+PID+"?expand=body.storage,version,space").then(function(pg){return fetch(CTX+"/rest/api/content/"+PID,{method:"PUT",credentials:"same-origin",headers:{"Content-Type":"application/json","X-Atlassian-Token":"no-check"},body:JSON.stringify(bumpPut(pg))}).then(function(r){if(r.ok)return true;var e=new Error("bump PUT -> "+r.status);e.status=r.status;throw e;});});}
 function bumpRetry(tries){return bumpOnce().catch(function(e){if(e&&e.status===409&&tries<2)return bumpRetry(tries+1);throw e;});}
 function scheduleBump(){if(_bump.timer||_bump.inflight)return;var since=Date.now()-_bump.lastAt;var wait=(since>=BUMP_MIN_MS)?BUMP_COALESCE_MS:Math.max(BUMP_COALESCE_MS,BUMP_MIN_MS-since);_bump.timer=setTimeout(function(){_bump.timer=null;runBump();},wait);}
-function runBump(){if(_bump.inflight||!_bump.pending)return;_bump.pending=false;_bump.inflight=true;bumpRetry(0).then(function(){_bump.lastAt=Date.now();_bump.fails=0;},function(e){_bump.fails++;if(window.console)console.warn("[WP] Activity-Bump:",e);if(_bump.fails<BUMP_MAX_FAILS)_bump.pending=true;}).then(function(){_bump.inflight=false;if(_bump.pending)scheduleBump();});}
-function requestActivityPing(comment){if(!IS_CONF||!PID)return;if(comment)_bump.comment=comment;_bump.pending=true;scheduleBump();}
-function sxJson(method,path,body){var x=new XMLHttpRequest();x.open(method,CTX+path,false);x.setRequestHeader("X-Atlassian-Token","no-check");x.setRequestHeader("Accept","application/json");if(body!=null)x.setRequestHeader("Content-Type","application/json");try{x.send(body!=null?JSON.stringify(body):null);}catch(e){return {status:0,text:""};}return {status:x.status,text:x.responseText};}
-// Close-Flush: ausstehenden Bump bei beforeunload/hidden sofort, synchron, Best-Effort (umgeht die Drosselung).
-function flushActivityNow(){if(!IS_CONF||!PID||!_bump.pending||_bump.inflight)return;if(_bump.timer){clearTimeout(_bump.timer);_bump.timer=null;}_bump.pending=false;try{var g=sxJson("GET","/rest/api/content/"+PID+"?expand=body.storage,version,space",null);if(!g||g.status<200||g.status>=300)return;var pg=JSON.parse(g.text);sxJson("PUT","/rest/api/content/"+PID,bumpPut(pg));}catch(e){}}
-function RestStore(){var fn="wpdata.json";function meta(){return jget("/rest/api/content/"+PID+"/child/attachment?filename="+fn+"&expand=version").then(function(d){return (d.results&&d.results[0])||null;});}return {name:"rest",load:function(){return meta().then(function(a){if(!a)return null;return fetch(CTX+"/download/attachments/"+PID+"/"+fn+"?cb="+Date.now(),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("download "+fn+" -> "+r.status);return r.json();});});},save:function(model){var blob=new Blob([JSON.stringify(model)],{type:"application/json"});var fd=new FormData();fd.append("file",blob,fn);fd.append("minorEdit","true");fd.append("comment","auto-save");return meta().then(function(a){var url=a?("/rest/api/content/"+PID+"/child/attachment/"+a.id+"/data"):("/rest/api/content/"+PID+"/child/attachment");return fetch(CTX+url,{method:"POST",credentials:"same-origin",headers:{"X-Atlassian-Token":"no-check"},body:fd}).then(function(r){if(!r.ok)throw new Error("save "+fn+" -> "+r.status);return true;});});},reset:function(){return Promise.resolve();}};}
+function runBump(){if(_bump.inflight||!_bump.pending)return;_bump.pending=false;_bump.inflight=true;bumpRetry(0).then(function(){_bump.lastAt=Date.now();_bump.fails=0;setLS(bumpKey(),"");},function(e){_bump.fails++;if(window.console)console.warn("[WP] Activity-Bump:",e);if(_bump.fails<BUMP_MAX_FAILS)_bump.pending=true;else setLS(bumpKey(),"");}).then(function(){_bump.inflight=false;if(_bump.pending)scheduleBump();});}
+function bumpKey(){return "wp-bump-"+PID;}
+function requestActivityPing(comment){if(!IS_CONF||!PID)return;if(comment)_bump.comment=comment;_bump.pending=true;setLS(bumpKey(),"1");scheduleBump();}
+
+// Beim Verstecken/Verlassen: ausstehenden Bump sofort ASYNCHRON anstossen (umgeht die Drosselung). Synchrones XHR
+// blockiert die Oberflaeche und wird von Chrome beim Schliessen verworfen. Bricht der Browser den Bump ab, holt ihn
+// der naechste Seitenaufruf desselben Nutzers nach (Merker in localStorage, s. start()).
+function flushActivityNow(){if(!IS_CONF||!PID||!_bump.pending||_bump.inflight)return;if(_bump.timer){clearTimeout(_bump.timer);_bump.timer=null;}runBump();}
+
 /* === Property-Store-Adapter — Persistenz liegt in persistence.js (VertretiosPersistence.Store).
    Port der gehaerteten urlaubios-Persistenz: Copy-on-Write mit Token, Manifest-CAS, Nachlesen bei
    5xx, Umzug bei Bereichswechsel, Historie (10 Generationen), Admin-Wiederherstellung, Platzhalter
@@ -255,6 +274,8 @@ function PropertyStore(){
     saveMerge:function(m,replay,baseGen){return st.saveMerge(m,replay,baseGen);},
     // Erst-Import (Seed/Version-Stempel): ueberschreibt NIE vorhandene Daten anderer.
     save:function(m){return st.saveMerge(m,P.replayInitial(m),st.gen);},
+    // Frischen Stand holen, ohne bei einem Netzfehler in den Schreibschutz zu fallen (Auto-Aktualisierung).
+    refresh:function(){st.replayQueue=[];return st.refreshAndReplay().then(function(m){return st.source==="none"?null:cp(m);});},
     peekServerGen:function(){return st.peekGen().catch(function(){return st.gen;});},
     currentGen:function(){return st.gen;},
     isReadOnly:function(){return !!st.readOnly;},
@@ -265,7 +286,21 @@ function PropertyStore(){
     reset:function(){return Promise.resolve();}
   };
 }
-function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jget("/rest/api/group/"+encodeURIComponent(GROUP)+"/member?limit=200")]).then(function(res){var u=res[0];var arr=(res[1].results||res[1]||[]);var ms=arr.map(function(m,i){return {id:(m.userKey||m.username||m.name),name:(m.displayName||m.fullName||m.username||m.name),order:i,username:(m.username||m.name)};});if(!ms.length)throw new Error("Gruppe '"+GROUP+"' leer oder nicht lesbar");return {cur:(u.userKey||u.username||u.name),curName:(u.displayName||u.fullName||u.username),members:ms};});}function remapSeed(seed,live){function norm(s){return String(s||"").toLowerCase().replace(/\s+/g," ").replace(/^ | $/g,"");}function tok(s){return norm(s).split(" ").filter(function(x){return x;});}var liveList=live.map(function(m){return {id:m.id,toks:tok(m.name),full:norm(m.name)};});var fullMap={};liveList.forEach(function(l){fullMap[l.full]=l.id;});function hasInit(l,init,notFirst){for(var i=0;i<l.toks.length;i++){if(l.toks[i].charAt(0)===init&&(!notFirst||l.toks[i].indexOf(notFirst)!==0))return true;}return false;}function matchName(name){var nn=norm(name);if(fullMap[nn])return fullMap[nn];var st=tok(name);if(!st.length)return null;var first=st[0];var initial=null,last=st[st.length-1];if(st.length>1&&/^[a-zäöüß]\.?$/.test(last))initial=last.charAt(0);var cands=liveList.filter(function(l){return l.toks.indexOf(first)>=0;});if(cands.length===1)return cands[0].id;if(cands.length>1&&initial){var f=cands.filter(function(l){return hasInit(l,initial,first);});if(f.length===1)return f[0].id;}if(first.length>=3){var pc=liveList.filter(function(l){for(var i=0;i<l.toks.length;i++){if(l.toks[i].indexOf(first)===0)return true;}return false;});if(pc.length===1)return pc[0].id;if(pc.length>1&&initial){var pf=pc.filter(function(l){return hasInit(l,initial,first);});if(pf.length===1)return pf[0].id;}}return null;}var sById={};(seed.members||[]).forEach(function(m){sById[m.id]=m;});function mp(sid){var sm=sById[sid];if(!sm)return null;return matchName(sm.name)||null;}var unset={},bestSeed=0,bestMapped=0,kannSeed=0,kannMapped=0;var reqs=(seed.requests||[]).map(function(r){var kann=[];(r.kann||[]).forEach(function(sid){kannSeed++;var l=mp(sid);if(l){kann.push(l);kannMapped++;}else{var s=sById[sid];unset[(s&&s.name)||sid]=1;}});var best=null;if(r.best){bestSeed++;var lb=mp(r.best);if(lb){best=lb;bestMapped++;}else{var sb=sById[r.best];unset[(sb&&sb.name)||r.best]=1;}}var dvu=r.dienstVonUser?(mp(r.dienstVonUser)||r.dienstVonUser):null;return {id:r.id,date:r.date,dienstVon:r.dienstVon,dienstVonUser:dvu,eintragVom:r.eintragVom,kann:kann,best:best,passed:[],remindedAt:r.remindedAt||null,confirmNotifiedAt:r.confirmNotifiedAt||null,bestAt:r.bestAt||null};});__importDiag={members:live.length,bestSeed:bestSeed,bestMapped:bestMapped,kannSeed:kannSeed,kannMapped:kannMapped,unmapped:Object.keys(unset)};if(__importDiag.unmapped.length&&window.console)console.warn("[WP] Erst-Import nicht zugeordnet:",__importDiag.unmapped);return {version:seed.version||3,config:seed.config||{reminderLeadDays:3},members:live,requests:reqs};}function getSeed(){var el=document.getElementById("wp-seed");if(el){try{return Promise.resolve(readSeed());}catch(e){return Promise.reject(e);}}return fetch(CTX+"/download/attachments/"+PID+"/seed.json?cb="+Date.now(),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("seed.json -> "+r.status);return r.json();});}function wireUserSearch(){var inp=document.getElementById("g-name"),dl=document.getElementById("names"),t=null;if(!inp)return;inp.addEventListener("input",function(){var q=inp.value.trim();if(t)clearTimeout(t);if(q.length<2)return;t=setTimeout(function(){jget("/rest/api/search/user?cql="+encodeURIComponent('user.fullname~"'+q+'*"')+"&limit=8").then(function(d){var res=(d.results||[]).map(function(x){return x.user||x;});dl.innerHTML=res.map(function(u){var nm=u.displayName||u.username;userCache[nm.toLowerCase()]=(u.username||u.userKey);return '<option value="'+nm+'">';}).join("");}).catch(function(){});},250);});}
+function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jget("/rest/api/group/"+encodeURIComponent(GROUP)+"/member?limit=200")]).then(function(res){var u=res[0];var arr=(res[1].results||res[1]||[]);var ms=arr.map(function(m,i){return {id:(m.userKey||m.username||m.name),name:(m.displayName||m.fullName||m.username||m.name),order:i,username:(m.username||m.name)};});if(!ms.length)throw new Error("Gruppe '"+GROUP+"' leer oder nicht lesbar");return {cur:(u.userKey||u.username||u.name),curName:(u.displayName||u.fullName||u.username),members:ms};});}function remapSeed(seed,live){function norm(s){return String(s||"").toLowerCase().replace(/\s+/g," ").replace(/^ | $/g,"");}function tok(s){return norm(s).split(" ").filter(function(x){return x;});}var liveList=live.map(function(m){return {id:m.id,toks:tok(m.name),full:norm(m.name)};});var fullMap={};liveList.forEach(function(l){fullMap[l.full]=l.id;});function hasInit(l,init,notFirst){for(var i=0;i<l.toks.length;i++){if(l.toks[i].charAt(0)===init&&(!notFirst||l.toks[i].indexOf(notFirst)!==0))return true;}return false;}function matchName(name){var nn=norm(name);if(fullMap[nn])return fullMap[nn];var st=tok(name);if(!st.length)return null;var first=st[0];var initial=null,last=st[st.length-1];if(st.length>1&&/^[a-zäöüß]\.?$/.test(last))initial=last.charAt(0);var cands=liveList.filter(function(l){return l.toks.indexOf(first)>=0;});if(cands.length===1)return cands[0].id;if(cands.length>1&&initial){var f=cands.filter(function(l){return hasInit(l,initial,first);});if(f.length===1)return f[0].id;}if(first.length>=3){var pc=liveList.filter(function(l){for(var i=0;i<l.toks.length;i++){if(l.toks[i].indexOf(first)===0)return true;}return false;});if(pc.length===1)return pc[0].id;if(pc.length>1&&initial){var pf=pc.filter(function(l){return hasInit(l,initial,first);});if(pf.length===1)return pf[0].id;}}return null;}var sById={};(seed.members||[]).forEach(function(m){sById[m.id]=m;});function mp(sid){var sm=sById[sid];if(!sm)return null;return matchName(sm.name)||null;}var unset={},bestSeed=0,bestMapped=0,kannSeed=0,kannMapped=0;var reqs=(seed.requests||[]).map(function(r){var kann=[];(r.kann||[]).forEach(function(sid){kannSeed++;var l=mp(sid);if(l){kann.push(l);kannMapped++;}else{var s=sById[sid];unset[(s&&s.name)||sid]=1;}});var best=null;if(r.best){bestSeed++;var lb=mp(r.best);if(lb){best=lb;bestMapped++;}else{var sb=sById[r.best];unset[(sb&&sb.name)||r.best]=1;}}var dvu=r.dienstVonUser?(mp(r.dienstVonUser)||r.dienstVonUser):null;return {id:r.id,date:r.date,dienstVon:r.dienstVon,dienstVonUser:dvu,eintragVom:r.eintragVom,kann:kann,best:best,passed:[],remindedAt:r.remindedAt||null,confirmNotifiedAt:r.confirmNotifiedAt||null,bestAt:r.bestAt||null};});__importDiag={members:live.length,bestSeed:bestSeed,bestMapped:bestMapped,kannSeed:kannSeed,kannMapped:kannMapped,unmapped:Object.keys(unset)};if(__importDiag.unmapped.length&&window.console)console.warn("[WP] Erst-Import nicht zugeordnet:",__importDiag.unmapped);return {version:seed.version||3,config:seed.config||{reminderLeadDays:3},members:live,requests:reqs};}function getSeed(){var el=document.getElementById("wp-seed");if(el){try{return Promise.resolve(readSeed());}catch(e){return Promise.reject(e);}}return fetch(CTX+"/download/attachments/"+PID+"/seed.json?cb="+Date.now(),{credentials:"same-origin"}).then(function(r){if(!r.ok)throw new Error("seed.json -> "+r.status);return r.json();});}// Vorschlagsliste "Dienst von": Poolmitglieder + bisherige Namen + (optional) Treffer der Benutzersuche.
+function fillNames(extra){var dl=document.getElementById("names");if(!dl||!model)return;var names={};model.members.forEach(function(m){names[m.name]=1;});model.requests.forEach(function(r){if(r.dienstVon)names[r.dienstVon]=1;});(extra||[]).forEach(function(n){if(n)names[n]=1;});dl.innerHTML=Object.keys(names).sort().map(function(n){return '<option value="'+esc(n)+'">';}).join("");}
+// Benutzersuche: der erste Endpunkt, der antwortet, wird fuer die Sitzung gemerkt.
+var USER_SEARCH=[
+  function(q){return jget("/rest/api/search/user?cql="+encodeURIComponent('user.fullname~"'+q+'*"')+"&limit=8").then(function(d){return (d.results||[]).map(function(x){return x.user||x;});});},
+  function(q){return jget("/rest/api/search?cql="+encodeURIComponent('user.fullname~"'+q+'*"')+"&limit=8").then(function(d){return (d.results||[]).map(function(x){return x.user||x;});});},
+  function(q){return jget("/rest/prototype/1/search/user.json?max-results=8&query="+encodeURIComponent(q)).then(function(d){return (d.result||[]).map(function(x){return {displayName:x.title,username:x.username,userKey:x.userKey};});});}
+];
+var _userSearch=null,_userSearchOff=false;
+function searchUsers(q,i){
+  if(_userSearch)return _userSearch(q);
+  i=i||0;if(i>=USER_SEARCH.length){_userSearchOff=true;if(window.console)console.warn("[WP] Benutzersuche nicht verfuegbar - 'Dienst von' ausserhalb des Pools bleibt Freitext (keine Zusage-Benachrichtigung).");return Promise.resolve([]);}
+  return USER_SEARCH[i](q).then(function(res){_userSearch=USER_SEARCH[i];return res;},function(){return searchUsers(q,i+1);});
+}
+function wireUserSearch(){var inp=document.getElementById("g-name"),t=null;if(!inp)return;inp.addEventListener("input",function(){var q=inp.value.replace(/["\\*]/g," ").trim();if(t)clearTimeout(t);if(q.length<2||_userSearchOff)return;t=setTimeout(function(){searchUsers(q).then(function(res){var found=[];res.forEach(function(u){if(!u)return;var nm=u.displayName||u.username,idv=u.username||u.userKey;if(!nm||!idv)return;userCache[String(nm).toLowerCase()]=idv;found.push(nm);});fillNames(found);}).catch(function(e){if(window.console)console.warn("[WP] Benutzersuche:",e);});},250);});}
   var SKEY="wp-data-s3",UKEY="wp-user-s3",VKEY="wp-view-s3";
   function readSeed(){var raw=document.getElementById("wp-seed").textContent;return JSON.parse(raw.slice(raw.indexOf("{"),raw.lastIndexOf("}")+1));}
   var WD=["So","Mo","Di","Mi","Do","Fr","Sa"];
@@ -289,7 +324,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   function getLS(k,dflt){try{var v=window.localStorage.getItem(k);return v===null?dflt:v;}catch(e){return dflt;}}
   function setLS(k,v){try{window.localStorage.setItem(k,v);}catch(e){}}
 
-  var SEED=null,storage=null,model=null,byId={},cur=null;
+  var storage=null,model=null,byId={},cur=null;
   var view=getLS(VKEY,"a");
   var today=new Date(),todayIso=key(today),curYear=today.getFullYear();
   var __testClock=false; // Selbsttest friert das Datum ein
@@ -312,12 +347,12 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   // Zentrale Zusage-Pruefung fuer Inbox, Liste, Detail und uebernehmen().
   function canConfirm(r){if(!r)return {ok:false,reason:"unbekannt"};if(r.date<todayIso)return {ok:false,reason:"vorbei"};if(r.best===cur)return {ok:false,reason:"bereits"};var ab=confirmFrom(r);if(!confirmAllowed(r))return {ok:false,reason:"frist",ab:ab};return {ok:true,ab:ab};}
   // Zusage-Button ODER einheitlicher Hinweis "Zusage ab ..." (nie ein Button, der nur alert() ausloest).
-  function zusageHtml(r,cls,label){var c=canConfirm(r);if(c.ok)return '<button type="button" class="btn '+cls+'" data-act="ueb" data-id="'+r.id+'">'+label+'</button>';if(c.reason==="frist")return '<span class="muted">Zusage ab '+fmt(c.ab)+' möglich</span>';return "";}
-  function validCfg(w,c,l){if(isNaN(w)||w<1||w>90)return "Zusagefenster: 1–90 Tage.";if(isNaN(c)||c<0||c>90)return "Kritisch: 0–90 Tage.";if(c>w)return "Kritisch darf nicht größer als das Zusagefenster sein.";if(isNaN(l)||l<0||l>30)return "Erinnerung: 0–30 Tage.";return "";}
+  function zusageHtml(r,cls,label){var c=canConfirm(r);if(c.ok)return dBtn("ueb",r.id,cls,label);if(c.reason==="frist")return '<span class="muted">Zusage ab '+fmt(c.ab)+' möglich</span>';return "";}
+  function validCfg(w,c,l){var R=CFG_RANGE;function out(v,k){return isNaN(v)||v<R[k][0]||v>R[k][1];}function rg(k){return R[k][0]+"\u2013"+R[k][1]+" Tage.";}if(out(w,"confirmWindowDays"))return "Zusagefenster: "+rg("confirmWindowDays");if(out(c,"criticalDays"))return "Kritisch: "+rg("criticalDays");if(c>w)return "Kritisch darf nicht gr\u00f6\u00dfer als das Zusagefenster sein.";if(out(l,"reminderLeadDays"))return "Erinnerung: "+rg("reminderLeadDays");return "";}
   function dayTxt(n){if(n>=7&&n%7===0)return (n===7?"1 Woche":(n/7)+" Wochen");return n===1?"1 Tag":n+" Tagen";}
   var act=[];
   function log(msg,over){act.unshift({t:new Date().toLocaleTimeString(),m:msg,o:!!over});if(act.length>50)act.pop();}
-  var _saveTimer=null,_dirty=false,_lastSaved=null,_saving=false,_pendingSave=false,_polling=false,_pollTimer=null;
+  var _saveTimer=null,_dirty=false,_lastSaved=null,_saving=false,_pendingSave=false,_polling=false,_pollTimer=null,_savePromise=Promise.resolve();
   var _baseGen=0;        // Server-Generation, auf der _lastSaved beruht (Basis fuer Delta-Merge)
   var _saveError=null;   // letzter Speicherfehler -> rotes Banner mit "Erneut versuchen"
   var _loadError=null;   // Ladefehler -> rotes Banner, App schreibgeschuetzt
@@ -348,32 +383,68 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     var f=document.getElementById("wp-foot");
     if(f){var inf=(storage&&storage.info)?storage.info():null;f.textContent="Build "+BUILD_VERSION+(inf&&inf.gen?" \u00b7 Datenstand Generation "+inf.gen+(inf.key?" ("+inf.key+")":""):"")+(isReadOnly()?" \u00b7 schreibgesch\u00fctzt":"");}
   }
-  function setStatus(msg,isErr){if(isErr){showError(new Error(msg));}else{log(msg);}}
+  
 
   /* --- Baustein 2: base->local Delta als Replay-Funktion ------------------
-     Bewahrt fremde Aenderungen an ANDEREN Datensaetzen und an anderen FELDERN
-     desselben Datensatzes. Einzige verbleibende last-write-wins-Stelle: zwei
-     Personen aendern dasselbe Feld desselben Datensatzes. Idempotent: setzt
-     konkrete Zielwerte / identifiziert Datensaetze ueber stabile r.id. */
+     Semantisch statt Feld-Diff, damit ein veralteter Tab nichts Fremdes ueberschreibt:
+       kann / passed    Mengen-Delta (nur eigene Zu-/Abgaenge), fremde Eintraege bleiben
+       best (+ bestAt, confirmNotifiedAt, remindedAt)
+                        nur, wenn die Vertretung seit der Basis niemand sonst geaendert hat
+       Zeitstempel      (remindedAt, confirmNotifiedAt, poolRemindedAt) nur, wenn seit der Basis
+                        unveraendert -> genau EIN Client gewinnt und verschickt die Mail
+       Loeschen         nicht, wenn inzwischen jemand anderes zugesagt hat
+       alles andere     eigener Wert gewinnt (Datum, Dienst von, ...)
+     Abgelehntes steht nach jedem Lauf in replay.conflicts [{id,k}]. Datensaetze ueber stabile r.id. */
+  var SET_FIELDS={kann:1,passed:1},BEST_FIELDS={best:1,bestAt:1,confirmNotifiedAt:1,remindedAt:1},STAMP_FIELDS={bestAt:1,remindedAt:1,confirmNotifiedAt:1,poolRemindedAt:1};
+  function cpy(o){return o==null?o:JSON.parse(JSON.stringify(o));}
+  function same(a,b){return JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b);}
   function buildReplay(base,local){
     base=base||{};local=local||{};
     var bReq={};(base.requests||[]).forEach(function(r){bReq[r.id]=r;});
     var lReq={};(local.requests||[]).forEach(function(r){lReq[r.id]=r;});
-    var adds=[];(local.requests||[]).forEach(function(r){if(!bReq[r.id])adds.push(JSON.parse(JSON.stringify(r)));});
+    var adds=[];(local.requests||[]).forEach(function(r){if(!bReq[r.id])adds.push(cpy(r));});
     var removes=[];(base.requests||[]).forEach(function(r){if(!lReq[r.id])removes.push(r.id);});
-    var changes={};Object.keys(lReq).forEach(function(id){if(!bReq[id])return;var b=bReq[id],l=lReq[id],f={},any=false;Object.keys(l).forEach(function(k){if(JSON.stringify(l[k])!==JSON.stringify(b[k])){f[k]=l[k];any=true;}});if(any)changes[id]=JSON.parse(JSON.stringify(f));});
-    var cfg=((JSON.stringify(local.config)!==JSON.stringify(base.config))&&local.config!=null)?JSON.parse(JSON.stringify(local.config)):null;
+    var changes={};
+    Object.keys(lReq).forEach(function(id){
+      var b=bReq[id],l=lReq[id];if(!b)return;var c={set:{},sets:{}},any=false;
+      Object.keys(l).forEach(function(k){
+        if(same(l[k],b[k]))return;any=true;
+        if(SET_FIELDS[k]){var bl=b[k]||[],ll=l[k]||[];c.sets[k]={add:ll.filter(function(x){return bl.indexOf(x)<0;}),del:bl.filter(function(x){return ll.indexOf(x)<0;})};}
+        else c.set[k]=cpy(l[k]===undefined?null:l[k]);
+      });
+      if(any)changes[id]=c;
+    });
+    var cfg=(!same(local.config,base.config)&&local.config!=null)?cpy(local.config):null;
     var lv=local.version||0;
-    return function(fresh){
+    function replay(fresh){
+      var conflicts=[];replay.conflicts=conflicts;
       fresh=fresh||{};fresh.requests=fresh.requests||[];
-      if(removes.length)fresh.requests=fresh.requests.filter(function(r){return removes.indexOf(r.id)<0;});
+      if(removes.length)fresh.requests=fresh.requests.filter(function(r){
+        if(removes.indexOf(r.id)<0)return true;
+        if(r.best&&!same(r.best,bReq[r.id].best)){conflicts.push({id:r.id,k:"remove"});return true;}
+        return false;
+      });
       var fById={};fresh.requests.forEach(function(r){fById[r.id]=r;});
-      Object.keys(changes).forEach(function(id){var r=fById[id];if(r){var f=changes[id];Object.keys(f).forEach(function(k){r[k]=JSON.parse(JSON.stringify(f[k]));});}});
-      adds.forEach(function(it){if(!fById[it.id])fresh.requests.push(JSON.parse(JSON.stringify(it)));});
+      Object.keys(changes).forEach(function(id){
+        var r=fById[id];if(!r)return;var c=changes[id],b=bReq[id];
+        Object.keys(c.sets).forEach(function(k){var arr=(r[k]||[]).slice(),dl=c.sets[k];dl.del.forEach(function(x){var i=arr.indexOf(x);if(i>=0)arr.splice(i,1);});dl.add.forEach(function(x){if(arr.indexOf(x)<0)arr.push(x);});r[k]=arr;});
+        var bestChanged=Object.prototype.hasOwnProperty.call(c.set,"best");
+        var bestOk=!bestChanged||same(r.best,b.best)||same(r.best,c.set.best);
+        var bestSame=same(r.best,b.best);
+        if(bestChanged&&!bestOk)conflicts.push({id:id,k:"best"});
+        Object.keys(c.set).forEach(function(k){
+          if(bestChanged&&BEST_FIELDS[k]){if(bestOk)r[k]=cpy(c.set[k]);return;}
+          if(STAMP_FIELDS[k]){if(bestSame&&same(r[k],b[k]))r[k]=cpy(c.set[k]);else conflicts.push({id:id,k:k});return;}
+          r[k]=cpy(c.set[k]);
+        });
+      });
+      adds.forEach(function(it){if(!fById[it.id])fresh.requests.push(cpy(it));});
       if(cfg){fresh.config=fresh.config||{};var k;for(k in cfg){if(cfg.hasOwnProperty(k))fresh.config[k]=cfg[k];}}
       fresh.version=Math.max(lv,fresh.version||0)||lv||2;
       return fresh;
-    };
+    }
+    replay.conflicts=[];
+    return replay;
   }
 
   // Uebernimmt den tatsaechlich persistierten Stand. Hat der Nutzer WAEHREND des
@@ -384,121 +455,181 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     if(IS_CONF&&__members)merged.members=__members;
     var curStr=JSON.stringify(model);
     if(curStr===sentStr){
-      if(JSON.stringify(merged)!==curStr){model=merged;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});render();}
+      if(JSON.stringify(merged)!==curStr){setModel(merged);render();}
       _lastSaved=JSON.stringify(model);syncBaseGen();
     }else{
       var fin=buildReplay(JSON.parse(sentStr),JSON.parse(curStr))(merged);
       if(IS_CONF&&__members)fin.members=__members;
-      model=fin;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});render();
-      _lastSaved=JSON.stringify(merged);syncBaseGen();_dirty=true; // Folge-Save bringt die Zwischen-Edits raus
+      _lastSaved=JSON.stringify(merged);syncBaseGen();
+      setModel(fin);render();_dirty=true; // Folge-Save bringt die Zwischen-Edits raus
     }
     hideUpdateBanner();
   }
+  // Abgelehnte eigene Aenderungen (veralteter Tab) sichtbar machen statt still zu verwerfen.
+  function conflictNotices(conf){
+    (conf||[]).forEach(function(c){var r=find(c.id);if(!r)return;var when=weekday(r.date)+" "+fmt(r.date);
+      if(c.k==="best")showNotice("Deine \u00c4nderung der Vertretung am "+when+" wurde nicht \u00fcbernommen: "+(r.best?nameOf(r.best)+" hat inzwischen zugesagt.":"der Dienst wurde inzwischen wieder freigegeben."));
+      else if(c.k==="remove")showNotice("Der Dienst am "+when+" wurde nicht gel\u00f6scht: "+nameOf(r.best)+" hat inzwischen zugesagt.");
+    });
+  }
+  /* --- Postausgang: Benachrichtigungen gehen erst NACH erfolgreichem Speichern raus ----
+     Aktion setzt den Zeitstempel im Modell (= Anspruch) und legt die Mail in den Postausgang.
+     Nach dem Speichern wird nur verschickt, wenn der Anspruch im gespeicherten Stand steht
+     (kein Konflikt, Vertretung unveraendert). Schlaegt der Versand fehl, wird der Zeitstempel
+     wieder geloescht -> faellige Erinnerungen werden beim naechsten Laden erneut versucht. */
+  var _outbox=[];
+  function queueMail(o){_outbox.push(o);}
+  function takeOutbox(){var q=_outbox;_outbox=[];return q;}
+  function flushOutbox(batch,conflicts){
+    (batch||[]).forEach(function(o){
+      var r=find(o.id),lost=(conflicts||[]).some(function(c){return c.id===o.id&&(c.k===o.field||c.k==="best");});
+      if(!r||lost||(r.best||null)!==(o.best||null)||r[o.field]!==o.stamp){log("[Hinweis] Benachrichtigung nicht verschickt (Stand hat sich inzwischen ge\u00e4ndert): "+o.note);return;}
+      if(!IS_CONF)return;
+      var p;try{p=o.group?shareGroup(o.group,o.note):shareUsers(o.to,o.note);}catch(e){p=Promise.reject(e);}
+      Promise.resolve(p).catch(function(e){
+        var r2=find(o.id);if(r2&&r2[o.field]===o.stamp&&(r2.best||null)===(o.best||null)){r2[o.field]=null;persist();render();}
+        showError(new Error("Benachrichtigung konnte nicht verschickt werden ("+((e&&e.message)||e)+"): "+o.note));
+      });
+    });
+  }
 
   function doSaveCore(){
-    if(_saving){_pendingSave=true;return Promise.resolve();}
+    if(_saving){_pendingSave=true;return _savePromise;}
     if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}
     if(!_dirty)return Promise.resolve();
     if(isReadOnly()){
-      // Schreibgeschuetzt (Ladefehler/Rueckfall): lokale Aenderung verwerfen, nie speichern.
-      _dirty=false;if(_lastSaved){try{model=JSON.parse(_lastSaved);byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});}catch(e){}}
+      // Schreibgeschuetzt (Ladefehler/Rueckfall): lokale Aenderung verwerfen, nie speichern, nichts verschicken.
+      _dirty=false;_outbox=[];if(_lastSaved){try{setModel(JSON.parse(_lastSaved));}catch(e){}}
       _saveError=new Error("Schreibgesch\u00fctzt \u2013 die Daten konnten nicht vollst\u00e4ndig geladen werden. \u00c4nderung wurde nicht gespeichert.");
       render();return Promise.resolve();
     }
     var js=JSON.stringify(model);
-    if(js===_lastSaved){_dirty=false;return Promise.resolve();}
+    if(js===_lastSaved){_dirty=false;flushOutbox(takeOutbox(),[]);return Promise.resolve();}
     _dirty=false;
+    var batch=takeOutbox();
     if(storage&&storage.saveMerge){
       _saving=true;
       var base=null;if(_lastSaved){try{base=JSON.parse(_lastSaved);}catch(e){base=null;}}
-      var local=JSON.parse(js),sentStr=js,replay=buildReplay(base,local);
+      // Mitglieder kommen bei jedem Laden frisch aus der Confluence-Gruppe -> nicht mitspeichern.
+      var local=JSON.parse(js),sentStr=js;local.members=[];
+      var inner=buildReplay(base,local),replay=function(fresh){var r=inner(fresh);r.members=[];return r;};
       // Basis-Generation mitgeben: nach Fehlern/Konflikten wird das Delta auf den FRISCHEN Stand gelegt.
       // _lastSaved bleibt bei Fehlern die Basis -> "Erneut versuchen" wiederholt genau dieses Delta.
-      return storage.saveMerge(local,replay,_baseGen).then(function(m){_saveError=null;adoptMerged(m,sentStr);renderStatus();},function(e){_dirty=true;onSaveErr(e);}).then(function(){_saving=false;if(_pendingSave||(_dirty&&!_saveError)){_pendingSave=false;persist();}});
+      _savePromise=storage.saveMerge(local,replay,_baseGen).then(function(m){_saveError=null;adoptMerged(m,sentStr);conflictNotices(inner.conflicts);flushOutbox(batch,inner.conflicts);renderStatus();},function(e){_dirty=true;_outbox=batch.concat(_outbox);onSaveErr(e);}).then(function(){_saving=false;if(_pendingSave||(_dirty&&!_saveError)){_pendingSave=false;persist();}});
+      return _savePromise;
     }
     _lastSaved=js;var r=storage.save(model);
-    return (r&&r.then)?r.catch(function(e){_lastSaved=null;onSaveErr(e);}):Promise.resolve();
+    if(r&&r.then)return r.then(function(){flushOutbox(batch,[]);},function(e){_lastSaved=null;_outbox=batch.concat(_outbox);onSaveErr(e);});
+    flushOutbox(batch,[]);return Promise.resolve();
   }
-  function doSave(){doSaveCore();}
+  
   // Kein synchroner Speicherpfad beim Schliessen (frueher: blinder Manifest-PUT + Loeschen -> Totalverlust).
   // Beim Verlassen/Verstecken nur den normalen async Copy-on-Write-Save anstossen; wird er vom Browser
   // abgebrochen, bleibt der alte Stand gueltig (es wird beim Entladen nie etwas geloescht).
   function flushPendingAsync(){if(_dirty&&!isReadOnly())doSaveCore();}
   function hasUnsaved(){return !isReadOnly()&&(_dirty||_saving||!!_saveTimer);}
-  function persist(){_dirty=true;if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(doSave,1500);}
+  function persist(){_dirty=true;if(_saveTimer)clearTimeout(_saveTimer);_saveTimer=setTimeout(doSaveCore,1500);}
 
   /* --- Baustein 1: Update-Hinweis per Generations-Polling -----------------
      Timer prueft alle 60s die Manifest-Generation; sofort bei Tab-Fokus;
-     im Hintergrund pausiert. Hoehere Serverversion -> dezentes Banner.
-     NICHTS wird automatisch neu gerendert; erst der Klick laedt frisch. */
-  function bannerHost(){return document.getElementById("wp-root")||document.body;}
-  function showUpdateBanner(){var el=document.getElementById("wp-update");if(!el){el=document.createElement("div");el.id="wp-update";el.className="wp-update-banner";var h=bannerHost();h.insertBefore(el,h.firstChild);el.innerHTML='<span class="txt">Es gibt neue \u00c4nderungen von anderen.</span><button type="button" data-action="apply-update">Jetzt aktualisieren</button>';var btn=el.querySelector("button");if(btn)btn.addEventListener("click",applyPendingUpdate);}el.style.display="flex";}
+     im Hintergrund pausiert. Hoehere Serverversion: ist gerade nichts offen
+     (keine ungespeicherte Aenderung, kein Dialog, kein Formular, kein Eingabefeld),
+     wird automatisch frisch geladen - sonst erscheint das Banner zum Anklicken. */
+  
+  function showUpdateBanner(){var el=document.getElementById("wp-update");if(!el){el=document.createElement("div");el.id="wp-update";el.className="wp-update-banner";var h=rootEl();h.insertBefore(el,h.firstChild);el.innerHTML='<span class="txt">Es gibt neue \u00c4nderungen von anderen.</span><button type="button" data-action="apply-update">Jetzt aktualisieren</button>';var btn=el.querySelector("button");if(btn)btn.addEventListener("click",function(){applyPendingUpdate(false);});}el.style.display="flex";}
   function hideUpdateBanner(){var el=document.getElementById("wp-update");if(el)el.style.display="none";}
   // Klick l-> frisch laden = korrekter Stand + Version. Offene eigene Edits werden
   // zuvor gemergt gespeichert, statt verworfen zu werden.
-  function reloadModel(){if(!(IS_CONF&&storage&&storage.load))return Promise.resolve();return storage.load().then(function(data){if(!data)return;upgradeData(data);if(!data.members||!data.members.length)data.members=__members;if(IS_CONF&&__members)data.members=__members;model=data;byId={};(model.members||[]).forEach(function(m){byId[m.id]=m;});_lastSaved=JSON.stringify(model);_dirty=false;_saveError=null;_loadError=null;syncBaseGen();},function(e){_loadError=e;renderStatus();throw e;});}
-  function applyPendingUpdate(){
-    function refresh(){return reloadModel().then(function(){hideUpdateBanner();render();setStatus("Aktualisiert.");});}
-    if(_dirty){doSaveCore().then(function(){if(_dirty){setStatus("Speichern fehlgeschlagen \u2014 Aktualisierung abgebrochen.",true);}else{refresh().catch(onSaveErr);}});}
-    else{refresh().catch(onSaveErr);}
+  function reloadModel(soft){
+    if(!(IS_CONF&&storage&&storage.load))return Promise.resolve();
+    // soft: nur frischen Stand holen (kein Schreibschutz bei Netzfehler); sonst vollstaendiges Laden (nach Wiederherstellung).
+    var p=(soft&&storage.refresh)?storage.refresh():storage.load();
+    return p.then(function(data){if(!data)return;upgradeData(data);data.members=__members;setModel(data);_lastSaved=JSON.stringify(model);_dirty=false;_saveError=null;_loadError=null;_outbox=[];syncBaseGen();},function(e){if(!soft||isReadOnly()){_loadError=e;renderStatus();}throw e;});
   }
-  function pollVersion(){if(_polling||!IS_CONF||document.hidden)return;if(!storage||!storage.peekServerGen||!storage.currentGen)return;_polling=true;storage.peekServerGen().then(function(g){_polling=false;if(g>_baseGen)showUpdateBanner();}).catch(function(){_polling=false;});}
+  function applyPendingUpdate(auto){
+    function refresh(){return reloadModel(true).then(function(){hideUpdateBanner();render();log(auto?"Automatisch aktualisiert (neuer Stand von anderen).":"Aktualisiert.");});}
+    // Erst laufende/offene eigene Aenderungen sicher speichern (gemergt), dann frisch laden - nie waehrend eines Saves.
+    function go(){
+      if(_saving)return _savePromise.then(go);
+      if(_dirty||_saveTimer)return doSaveCore().then(function(){if(_saveError)throw new Error("Speichern fehlgeschlagen \u2013 Aktualisierung abgebrochen.");return go();});
+      return refresh();
+    }
+    return Promise.resolve().then(go).catch(function(e){
+      if(_loadError)return;
+      if(auto){if(window.console)console.warn("[WP] Auto-Aktualisierung:",e);showUpdateBanner();}
+      else showError(new Error("Aktualisieren fehlgeschlagen: "+((e&&e.message)||e)));
+    });
+  }
+  function isIdle(){
+    if(_dirty||_saving||_saveTimer||detailId!=null||isReadOnly())return false;
+    var gc=document.getElementById("gcard");if(gc&&gc.style.display&&gc.style.display!=="none")return false;
+    var ae=document.activeElement,root=document.getElementById("wp-root");
+    if(ae&&root&&root.contains(ae)&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))return false;
+    return true;
+  }
+  function pollVersion(){if(_polling||!IS_CONF||document.hidden)return;if(!storage||!storage.peekServerGen||!storage.currentGen)return;_polling=true;function done(){_polling=false;}storage.peekServerGen().then(function(g){if(g>_baseGen){if(isIdle())return applyPendingUpdate(true);showUpdateBanner();}}).then(done,done);}
   function startPolling(){if(_pollTimer||!IS_CONF)return;_pollTimer=setInterval(pollVersion,60000);document.addEventListener("visibilitychange",function(){if(!document.hidden)pollVersion();});}
   function find(id){for(var i=0;i<model.requests.length;i++)if(model.requests[i].id===id)return model.requests[i];return null;}
   function initials(name){var p=name.trim().split(/\s+/);return (p.length>1?(p[0][0]+p[1][0]):name.slice(0,2)).toUpperCase();}
   // Beworbene aufsteigend nach bisher uebernommenen Diensten (Tiebreak: Vorschlag, dann Name); "weitergegeben" ans Ende -> wer am wenigsten hatte, steht vorn.
   function sortByLoad(ids,counts,pick,passed){counts=counts||{};passed=passed||[];return (ids||[]).slice().sort(function(a,b){var xa=passed.indexOf(a)>=0?1:0,xb=passed.indexOf(b)>=0?1:0;if(xa!==xb)return xa-xb;var ca=counts[a]||0,cb=counts[b]||0;if(ca!==cb)return ca-cb;if(pick){if(a===pick)return -1;if(b===pick)return 1;}var na=(byId[a]&&byId[a].name)||String(a),nb=(byId[b]&&byId[b].name)||String(b);return na<nb?-1:(na>nb?1:0);});}
 
-  // ---- Benachrichtigungen (Stubs) ----
-  function notifyConfirm(r){if(r.confirmNotifiedAt)return;var note='Dein Dienst am '+weekday(r.date)+' '+fmt(r.date)+' wird von '+byId[r.best].name+' uebernommen.';if(r.dienstVonUser){var __t=(byId[r.dienstVonUser]&&(byId[r.dienstVonUser].username||byId[r.dienstVonUser].id))||r.dienstVonUser;log('[Teilen -> User '+__t+'] '+note);r.confirmNotifiedAt=todayIso;if(IS_CONF)shareUsers([__t],note).catch(showError);}else{log('[Hinweis] Bestaetigung nicht verschickt: Dienst von ('+r.dienstVon+') ist kein Confluence-User');}}
-  function notifyDuty(r,manual){if(!r.best)return;var m=byId[r.best],target=m.username||m.id;var note='Erinnerung: '+weekday(r.date)+' '+fmt(r.date)+' uebernimmst du den Wochenenddienst'+(r.dienstVon?' (Dienst von '+r.dienstVon+')':'')+'.';log('[Teilen -> User '+target+'] '+note+(manual?' [manuell]':' [faellig]'));r.remindedAt=todayIso;if(IS_CONF)shareUsers([target],note).catch(showError);}
-  function poolRemind(r){var sg=suggestFor(r,byId,yearCounts(model,curYear));var who=sg?(" Vorschlag: "+sugText(sg)+"."):"";var note='Bitte um Vertretung: '+weekday(r.date)+' '+fmt(r.date)+(r.dienstVon?' (Dienst von '+r.dienstVon+')':'')+' ist noch offen.'+who;log('[Teilen -> Gruppe '+GROUP+'] '+note);if(IS_CONF)shareGroup(GROUP,note).catch(showError);}
-  function runDueReminders(){if(isGuest())return;var L=lead(),changed=false;model.requests.forEach(function(r){if(r.best&&r.date>=todayIso&&!r.remindedAt&&days(todayIso,r.date)<=L){notifyDuty(r,false);changed=true;}});if(changed)persist();}
+  // ---- Benachrichtigungen (Versand erst nach dem Speichern, s. Postausgang) ----
+  function notifyConfirm(r){if(r.confirmNotifiedAt||!r.best)return;var note='Dein Dienst am '+weekday(r.date)+' '+fmt(r.date)+' wird von '+nameOf(r.best)+' uebernommen.';if(!r.dienstVonUser){log('[Hinweis] Bestaetigung nicht verschickt: Dienst von ('+r.dienstVon+') ist kein Confluence-User');return;}var t=(byId[r.dienstVonUser]&&(byId[r.dienstVonUser].username||byId[r.dienstVonUser].id))||r.dienstVonUser;log('[Teilen -> User '+t+'] '+note);r.confirmNotifiedAt=todayIso;queueMail({id:r.id,field:"confirmNotifiedAt",stamp:todayIso,best:r.best,to:[t],note:note});}
+  function notifyDuty(r,manual){if(!r.best)return false;var m=byId[r.best];if(!m){log('[Hinweis] Erinnerung nicht verschickt: Vertretung ('+r.best+') ist nicht mehr in der Gruppe '+GROUP+' ('+fmt(r.date)+')');return false;}var target=m.username||m.id;var note='Erinnerung: '+weekday(r.date)+' '+fmt(r.date)+' uebernimmst du den Wochenenddienst'+(r.dienstVon?' (Dienst von '+r.dienstVon+')':'')+'.';log('[Teilen -> User '+target+'] '+note+(manual?' [manuell]':' [faellig]'));r.remindedAt=todayIso;queueMail({id:r.id,field:"remindedAt",stamp:todayIso,best:r.best,to:[target],note:note});return true;}
+  function poolRemind(r){if(r.best||r.date<todayIso)return false;if(r.poolRemindedAt===todayIso){alert("Der Pool wurde heute bereits an diesen Termin erinnert.");return false;}var sg=suggestFor(r,byId,yearCounts(model,curYear));var who=sg?(" Vorschlag: "+sugText(sg)+"."):"";var note='Bitte um Vertretung: '+weekday(r.date)+' '+fmt(r.date)+(r.dienstVon?' (Dienst von '+r.dienstVon+')':'')+' ist noch offen.'+who;log('[Teilen -> Gruppe '+GROUP+'] '+note);r.poolRemindedAt=todayIso;queueMail({id:r.id,field:"poolRemindedAt",stamp:todayIso,best:null,group:GROUP,note:note});return true;}
+  function runDueReminders(){if(isGuest())return;var L=lead(),changed=false;model.requests.forEach(function(r){try{if(r.best&&r.date>=todayIso&&!r.remindedAt&&days(todayIso,r.date)<=L){if(notifyDuty(r,false))changed=true;}}catch(e){if(window.console)console.warn("[WP] Erinnerung "+(r&&r.id)+":",e);}});if(changed)persist();}
 
   // ---- Aktionen ----
-  function toggleKann(id){var r=find(id);if(!r||!needMember())return;if(r.passed){var pp=r.passed.indexOf(cur);if(pp>=0)r.passed.splice(pp,1);}var i=r.kann.indexOf(cur);if(i>=0){r.kann.splice(i,1);log(meName()+' entfernt kann bei '+fmt(r.date));}else{r.kann.push(cur);log(meName()+' markiert kann bei '+fmt(r.date));feedEvent("eintragen",r);}persist();render();}function pass(id){var r=find(id);if(!r||r.best||!needMember())return;if(!r.passed)r.passed=[];if(r.passed.indexOf(cur)<0){r.passed.push(cur);log(meName()+' gibt '+fmt(r.date)+' an die/den Naechste(n) weiter');}persist();render();}
-  function freigeben(id){var r=find(id);if(!r||!r.best)return;var mine=r.best===cur;if(!mine&&!isAdmin())return;var prev=byId[r.best]?byId[r.best].name:r.best;r.best=null;r.confirmNotifiedAt=null;r.remindedAt=null;r.bestAt=null;log(meName()+(mine?"":" (Admin)")+' gibt '+fmt(r.date)+' wieder frei'+(mine?"":' (war: '+prev+')'));persist();render();}
+  function toggleKann(id){var r=find(id);if(!r||!needMember())return;dropPassed(r,cur);var i=r.kann.indexOf(cur);if(i>=0){r.kann.splice(i,1);log(meName()+' entfernt kann bei '+fmt(r.date));}else{r.kann.push(cur);log(meName()+' markiert kann bei '+fmt(r.date));feedEvent("eintragen",r);}persist();render();}function pass(id){var r=find(id);if(!r||r.best||!needMember())return;if(!r.passed)r.passed=[];if(r.passed.indexOf(cur)<0){r.passed.push(cur);log(meName()+' gibt '+fmt(r.date)+' an die/den Naechste(n) weiter');}persist();render();}
+  function freigeben(id){var r=find(id);if(!r||!r.best)return;var mine=r.best===cur;if(!mine&&!isAdmin())return;var prev=nameOf(r.best);r.best=null;r.confirmNotifiedAt=null;r.remindedAt=null;r.bestAt=null;log(meName()+(mine?"":" (Admin)")+' gibt '+fmt(r.date)+' wieder frei'+(mine?"":' (war: '+prev+')'));persist();render();}
   // Reihenfolge: zuerst Frist pruefen, erst danach die Ersetzen-Rueckfrage.
-  function uebernehmen(id){var r=find(id);if(!r||!needMember())return;var c=canConfirm(r);if(!c.ok){if(c.reason==="frist"){alert('Verbindliche Zusage ist erst ab '+fmt(c.ab)+' moeglich (Frist: '+cwin()+' Tage vor dem Termin). Noch '+days(todayIso,r.date)+' Tage bis zum Termin.');}return;}if(r.best&&r.best!==cur){if(!confirm(byId[r.best].name+' hat bereits bestaetigt. Vertretung ersetzen?'))return;log('ersetzt Vertretung '+byId[r.best].name+' -> '+meName()+' ('+fmt(r.date)+')',true);}var changed=r.best!==cur;r.best=cur;if(!r.kann)r.kann=[];if(r.kann.indexOf(cur)<0)r.kann.push(cur);if(r.passed){var __pp=r.passed.indexOf(cur);if(__pp>=0)r.passed.splice(__pp,1);}if(changed){r.confirmNotifiedAt=null;r.remindedAt=null;r.bestAt=todayIso;}log(meName()+' uebernimmt '+fmt(r.date));notifyConfirm(r);persist();render();}
-  function remind(id){var r=find(id);if(!r||!r.best)return;notifyDuty(r,true);persist();render();}
-  function pool(id){var r=find(id);if(!r)return;poolRemind(r);render();}
-  function anlegen(){if(isGuest())return;var dt=document.getElementById("g-date").value,nm=document.getElementById("g-name").value.trim(),h=document.getElementById("g-hint");if(!dt){h.innerHTML='<span style="color:var(--danger)">Bitte ein Datum waehlen.</span>';return;}if(!nm){h.innerHTML='<span style="color:var(--danger)">Bitte Dienst von angeben.</span>';return;}var adm=isAdmin(),einEl=document.getElementById("g-ein"),bestEl=document.getElementById("g-best");var ein=(adm&&einEl&&einEl.value)?einEl.value:todayIso;var bst=(adm&&bestEl&&bestEl.value&&byId[bestEl.value])?bestEl.value:null;var m=model.members.filter(function(x){return x.name.toLowerCase()===nm.toLowerCase();})[0];var nr={id:"n"+Date.now(),date:dt,dienstVon:nm,dienstVonUser:(m?m.id:(userCache[nm.toLowerCase()]||null)),eintragVom:ein,kann:(bst?[bst]:[]),best:bst,passed:[],remindedAt:null,confirmNotifiedAt:null,bestAt:(bst?ein:null)};model.requests.push(nr);log(meName()+' legt Gesuch an: '+fmt(dt)+' (Dienst von '+nm+')'+(m?'':' [Freitext]')+(bst?' — uebernommen von '+byId[bst].name:'')+(dt<todayIso?' [rueckwirkend]':''));feedEvent("bereitstellen",nr);persist();document.getElementById("g-name").value="";document.getElementById("g-date").value="";if(einEl)einEl.value="";if(bestEl)bestEl.value="";document.getElementById("g-hint").textContent="";document.getElementById("gcard").style.display="none";render();}
+  function uebernehmen(id){var r=find(id);if(!r||!needMember())return;var c=canConfirm(r);if(!c.ok){if(c.reason==="frist"){alert('Verbindliche Zusage ist erst ab '+fmt(c.ab)+' moeglich (Frist: '+cwin()+' Tage vor dem Termin). Noch '+days(todayIso,r.date)+' Tage bis zum Termin.');}return;}if(r.best&&r.best!==cur){if(!confirm(nameOf(r.best)+' hat bereits bestaetigt. Vertretung ersetzen?'))return;log('ersetzt Vertretung '+nameOf(r.best)+' -> '+meName()+' ('+fmt(r.date)+')',true);}var changed=r.best!==cur;r.best=cur;if(!r.kann)r.kann=[];if(r.kann.indexOf(cur)<0)r.kann.push(cur);dropPassed(r,cur);if(changed){r.confirmNotifiedAt=null;r.remindedAt=null;r.bestAt=todayIso;}log(meName()+' uebernimmt '+fmt(r.date));notifyConfirm(r);persist();render();}
+  function remind(id){var r=find(id);if(!r||!r.best)return;if(notifyDuty(r,true))persist();else alert("Erinnerung nicht möglich: "+nameOf(r.best)+" ist nicht mehr in der Gruppe „"+GROUP+"“.");render();}
+  function pool(id){var r=find(id);if(!r)return;if(poolRemind(r))persist();render();}
+  function anlegen(){if(isGuest())return;var dt=document.getElementById("g-date").value,nm=document.getElementById("g-name").value.trim(),h=document.getElementById("g-hint");function bad(t){h.innerHTML='<span style="color:var(--danger)">'+esc(t)+'</span>';}if(!dt){bad("Bitte ein Datum waehlen.");return;}if(!nm){bad("Bitte Dienst von angeben.");return;}if(model.requests.some(function(x){return x.date===dt&&String(x.dienstVon||"").toLowerCase()===nm.toLowerCase();})){bad("Für "+fmt(dt)+" gibt es bereits ein Gesuch von "+nm+".");return;}var adm=isAdmin(),einEl=document.getElementById("g-ein"),bestEl=document.getElementById("g-best");var ein=(adm&&einEl&&einEl.value)?einEl.value:todayIso;var bst=(adm&&bestEl&&bestEl.value&&byId[bestEl.value])?bestEl.value:null;var m=memberByName(nm);var nr={id:newId(),date:dt,dienstVon:nm,dienstVonUser:(m?m.id:(userCache[nm.toLowerCase()]||null)),eintragVom:ein,kann:(bst?[bst]:[]),best:bst,passed:[],remindedAt:null,confirmNotifiedAt:null,bestAt:(bst?ein:null)};model.requests.push(nr);log(meName()+' legt Gesuch an: '+fmt(dt)+' (Dienst von '+nm+')'+(m?'':' [Freitext]')+(bst?' — uebernommen von '+nameOf(bst):'')+(dt<todayIso?' [rueckwirkend]':''));feedEvent("bereitstellen",nr);persist();document.getElementById("g-name").value="";document.getElementById("g-date").value="";if(einEl)einEl.value="";if(bestEl)bestEl.value="";h.textContent="";document.getElementById("gcard").style.display="none";fillNames();render();}
   function aufraeumen(){var cut=key(ad(today,-365));var old=model.requests.filter(function(r){return r.date<cut;});if(!old.length){alert("Keine Termine aelter als 12 Monate.");return;}if(!confirm(old.length+" Termine aelter als 12 Monate (vor "+cut+") endgueltig loeschen?"))return;model.requests=model.requests.filter(function(r){return r.date>=cut;});log(old.length+" alte Termine aufgeraeumt (vor "+cut+")");persist();render();}
-  function resetAll(){if(IS_CONF){onSaveErr(new Error("Zur\u00fccksetzen ist in Confluence deaktiviert \u2013 \u00e4ltere St\u00e4nde bitte \u00fcber \u201eDatenst\u00e4nde (Admin)\u201c wiederherstellen."));return;}if(!confirm("Auf den migrierten Excel-Stand zuruecksetzen? Lokale Aenderungen gehen verloren."))return;storage.reset();model=storage.load();byId={};model.members.forEach(function(m){byId[m.id]=m;});act=[];runDueReminders();log("Daten auf Seed zurueckgesetzt");render();}
+  function resetAll(){if(IS_CONF)return;if(!confirm("Auf den migrierten Excel-Stand zuruecksetzen? Lokale Aenderungen gehen verloren."))return;storage.reset();setModel(storage.load());act=[];_outbox=[];runDueReminders();log("Daten auf Seed zurueckgesetzt");render();}
   // ---- Regeln (Admin) ----
   function saveCfg(){if(!isAdmin())return;var h=document.getElementById("cfg-hint");function rd(id){var v=document.getElementById(id).value;return /^\s*\d+\s*$/.test(v)?parseInt(v,10):NaN;}var w=rd("cfg-cwin"),c=rd("cfg-crit"),l=rd("cfg-lead");var err=validCfg(w,c,l);if(err){h.innerHTML='<span style="color:var(--danger)">'+err+'</span>';return;}if(w===cwin()&&c===crit()&&l===lead()){h.textContent="Keine Änderung.";return;}model.config=model.config||{};model.config.confirmWindowDays=w;model.config.criticalDays=c;model.config.reminderLeadDays=l;log(meName()+" ändert Regeln: Zusage ab "+w+" T., kritisch ab "+c+" T., Erinnerung "+l+" T. vorher");persist();runDueReminders();render();h.textContent="Gespeichert.";}
-  function renderCfg(){var card=document.getElementById("cfgcard");if(!card)return;var adm=isAdmin();card.style.display=adm?"":"none";if(!adm)return;var ids={"cfg-cwin":cwin(),"cfg-crit":crit(),"cfg-lead":lead()},ae=document.activeElement;Object.keys(ids).forEach(function(id){var el=document.getElementById(id);if(el&&el!==ae)el.value=ids[id];});var h=document.getElementById("cfg-hint");if(h&&!h.textContent)h.innerHTML='<span class="muted">Aktiv: Zusage ab '+cwin()+' Tagen, kritisch ab '+crit()+' Tagen, Erinnerung '+lead()+' Tage vor dem Termin.</span>';}
+  function renderCfg(){var card=document.getElementById("cfgcard");if(!card)return;var adm=isAdmin();card.style.display=adm?"":"none";if(!adm)return;var ids={"cfg-cwin":["confirmWindowDays",cwin()],"cfg-crit":["criticalDays",crit()],"cfg-lead":["reminderLeadDays",lead()]},ae=document.activeElement;Object.keys(ids).forEach(function(id){var el=document.getElementById(id),rg=CFG_RANGE[ids[id][0]];if(!el)return;el.min=rg[0];el.max=rg[1];if(el!==ae)el.value=ids[id][1];});var h=document.getElementById("cfg-hint");if(h&&!h.textContent)h.innerHTML='<span class="muted">Aktiv: Zusage ab '+cwin()+' Tagen, kritisch ab '+crit()+' Tagen, Erinnerung '+lead()+' Tage vor dem Termin.</span>';}
   function renderGuide(){function fill(sel,txt){var els=document.querySelectorAll(sel);for(var i=0;i<els.length;i++)els[i].textContent=txt;}fill(".cfg-cw",dayTxt(cwin()).replace(/ Tagen$/," Tage"));fill(".cfg-cr",dayTxt(crit()));fill(".cfg-ld",dayTxt(lead()).replace(/ Tagen$/," Tage"));}
 
 
   // ---- Render: Ansicht A (Inbox) ----
-  function inboxCard(r,mode,counts){
-    var n=days(todayIso,r.date),cd=n===0?"heute":(n===1?"morgen":"in "+n+" Tagen"),hn=holiday(r.date);
+  function inboxCard(r,mode,counts,sg){
+    var n=days(todayIso,r.date),hn=holiday(r.date);
     var cls="icard"+(mode==="vorschlag"?" rec":"")+(mode==="kritisch"?" crit":"")+(mode==="mit"?" mit":"");
     var pill="";
     if(mode==="vorschlag")pill='<span class="pill rec">Vorschlag für dich</span> ';
     else if(mode==="kritisch")pill='<span class="pill crit">kritisch</span> ';
-    else if(mode==="mit")pill='<span class="pill mit">gleichauf</span> ';else if(mode==="meine"&&!r.remindedAt&&n<=lead())pill='<span class="pill due">Erinnerung fällig</span> ';else if(mode==="beob"&&(r.passed||[]).indexOf(cur)>=0)pill='<span class="pill mit">weitergegeben</span> ';
-    var sg=suggestFor(r,byId,counts);var sl=(sg&&(mode==="vorschlag"||mode==="mit"||mode==="kritisch"))?(" · Vorschlag: "+sugText(sg)):"";var meta="Dienst von "+(r.dienstVon||"—")+" · "+cd+(hn?" · "+hn:"")+" · "+r.kann.length+" Interessent(en)"+sl;
+    else if(mode==="mit")pill='<span class="pill mit">gleichauf</span> ';
+    else if(mode==="meine"&&!r.remindedAt&&n<=lead())pill='<span class="pill due">Erinnerung fällig</span> ';
+    else if(mode==="beob"&&(r.passed||[]).indexOf(cur)>=0)pill='<span class="pill mit">weitergegeben</span> ';
+    if(sg===undefined)sg=suggestFor(r,byId,counts);
+    var sl=(sg&&(mode==="vorschlag"||mode==="mit"||mode==="kritisch"))?(" · Vorschlag: "+esc(sugText(sg))):"";
+    var meta="Dienst von "+esc(r.dienstVon||"—")+" · "+inDays(n)+(hn?" · "+hn:"")+" · "+r.kann.length+" Interessent(en)"+sl;
     var a="";
-    if(mode==="vorschlag")a=zusageHtml(r,"prim sm","Jetzt definitiv zusagen, du wärst dran")+'<button class="btn sm" data-act="pass" data-id="'+r.id+'">Nicht ich – weitergeben</button>';
-    else if(mode==="kann"){var has=r.kann.indexOf(cur)>=0;a='<button class="btn sm'+(has?" on":"")+'" data-act="kann" data-id="'+r.id+'">'+(has?"✓ kann":"+ kann")+'</button>'+(canConfirm(r).ok?zusageHtml(r,"sm","zusagen"):"");}
-    else if(mode==="kritisch")a=zusageHtml(r,"prim sm","zusagen")+'<button class="btn sm" data-act="pool" data-id="'+r.id+'">Pool erinnern</button>';else if(mode==="mit")a=zusageHtml(r,"prim sm","Definitiv zusagen nach Abstimmung");
-    else if(mode==="meine")a='<button class="btn sm" data-act="remind" data-id="'+r.id+'">'+(r.remindedAt?"erneut erinnern":"jetzt erinnern")+'</button><button class="btn warn sm" data-act="frei" data-id="'+r.id+'">freigeben</button>';
-    else if(mode==="beob"){var pz=(r.passed||[]).indexOf(cur)>=0;var has2=r.kann.indexOf(cur)>=0;a=zusageHtml(r,"prim sm",(pz?"doch zusagen":"zusagen"))+'<button class="btn sm'+(has2?" on":"")+'" data-act="kann" data-id="'+r.id+'">'+(has2?"✓ kann":"+ kann")+'</button>';}
-    return '<div class="'+cls+' clk" data-detail="'+r.id+'"><div><div class="t">'+pill+weekday(r.date)+" "+fmt(r.date)+'</div><div class="m">'+meta+'</div></div><div class="iacts">'+a+'</div></div>';
+    if(mode==="vorschlag")a=zusageHtml(r,"prim sm","Jetzt definitiv zusagen, du wärst dran")+dBtn("pass",r.id,"sm","Nicht ich – weitergeben");
+    else if(mode==="kann")a=kannBtn(r)+(canConfirm(r).ok?zusageHtml(r,"sm","zusagen"):"");
+    else if(mode==="kritisch")a=zusageHtml(r,"prim sm","zusagen")+dBtn("pool",r.id,"sm","Pool erinnern");
+    else if(mode==="mit")a=zusageHtml(r,"prim sm","Definitiv zusagen nach Abstimmung");
+    else if(mode==="meine")a=dBtn("remind",r.id,"sm",(r.remindedAt?"erneut erinnern":"jetzt erinnern"))+dBtn("frei",r.id,"warn sm","freigeben");
+    else if(mode==="beob")a=zusageHtml(r,"prim sm",((r.passed||[]).indexOf(cur)>=0?"doch zusagen":"zusagen"))+kannBtn(r);
+    return '<div class="'+cls+' clk" data-detail="'+esc(r.id)+'"><div><div class="t">'+pill+weekday(r.date)+" "+fmt(r.date)+'</div><div class="m">'+meta+'</div></div><div class="iacts">'+a+'</div></div>';
   }
-  function section(title,arr,mode,counts,emptyTxt){
-    var body=arr.length?arr.map(function(r){return inboxCard(r,mode,counts);}).join(""):'<div class="empty">'+emptyTxt+'</div>';
+  function section(title,arr,mode,counts,emptyTxt,sgs){
+    var body=arr.length?arr.map(function(r){return inboxCard(r,mode,counts,(sgs&&Object.prototype.hasOwnProperty.call(sgs,r.id))?sgs[r.id]:undefined);}).join(""):'<div class="empty">'+emptyTxt+'</div>';
     return '<div class="sec"><h3>'+title+' <span class="cnt">'+arr.length+'</span></h3>'+body+'</div>';
   }
   // ---- Detail-Modal (fuer Inbox & Liste) ----
   var detailId=null;
-  function detailHost(){return document.getElementById("wp-root")||document.body;}
+  
   function openDetail(id){if(!find(id))return;detailId=id;renderDetail();}
-  function closeDetail(){detailId=null;var el=document.getElementById("wp-detail");if(el&&el.parentNode)el.parentNode.removeChild(el);}
-  function renderDetail(){if(detailId==null)return;var r=find(detailId);if(!r){closeDetail();return;}var el=document.getElementById("wp-detail");if(!el){el=document.createElement("div");el.id="wp-detail";detailHost().appendChild(el);}el.innerHTML=detailHtml(r);}
-  function dBtn(act,id,cls,label){return '<button type="button" class="btn '+cls+'" data-act="'+act+'" data-id="'+id+'">'+label+'</button>';}
+  function closeDetail(){detailId=null;var el=document.getElementById("wp-detail");if(el&&el.parentNode)el.parentNode.removeChild(el);var ub=document.getElementById("wp-update");if(ub&&ub.style.display!=="none"&&isIdle())applyPendingUpdate(true);}
+  function renderDetail(){if(detailId==null)return;var r=find(detailId);if(!r){closeDetail();return;}var el=document.getElementById("wp-detail");if(!el){el=document.createElement("div");el.id="wp-detail";rootEl().appendChild(el);}el.innerHTML=detailHtml(r);}
+  function dBtn(act,id,cls,label){return '<button type="button" class="btn '+cls+'" data-act="'+act+'" data-id="'+esc(id)+'">'+label+'</button>';}
+  function kannBtn(r){var has=r.kann.indexOf(cur)>=0;return dBtn("kann",r.id,"sm"+(has?" on":""),(has?"✓ kann":"+ kann"));}
   function detailActions(r){
     var out=[],del=canDelete(r);
     if(r.date<todayIso){
@@ -512,7 +643,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
       if(del)out.push(dBtn("del",r.id,"warn sm","Dienst löschen"));
     }else{
       var has=r.kann.indexOf(cur)>=0;
-      out.push(dBtn("kann",r.id,"sm"+(has?" on":""),(has?"✓ kann":"+ kann")));
+      out.push(kannBtn(r));
       out.push(zusageHtml(r,"prim sm","zusagen"));
       if(has&&(r.passed||[]).indexOf(cur)<0)out.push(dBtn("pass",r.id,"sm","Nicht ich – weitergeben"));
       out.push(dBtn("pool",r.id,"sm","Pool erinnern"));
@@ -526,23 +657,22 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     if(ei&&ei.value&&ei.value!==(r.eintragVom||"")){parts.push("Eintrag "+(r.eintragVom?fmt(r.eintragVom):"—")+" -> "+fmt(ei.value));r.eintragVom=ei.value;chg=true;}
     if(de.value&&de.value!==r.date){parts.push("Datum "+fmt(r.date)+" -> "+fmt(de.value));r.date=de.value;chg=true;}
     var nn=dv.value.trim();
-    if(nn!==(r.dienstVon||"")){var m=model.members.filter(function(x){return x.name.toLowerCase()===nn.toLowerCase();})[0];r.dienstVon=nn;r.dienstVonUser=m?m.id:(userCache[nn.toLowerCase()]||null);parts.push("Dienst von -> "+(nn||"—"));chg=true;}
+    if(nn!==(r.dienstVon||"")){var m=memberByName(nn);r.dienstVon=nn;r.dienstVonUser=m?m.id:(userCache[nn.toLowerCase()]||null);parts.push("Dienst von -> "+(nn||"—"));chg=true;}
     if(chg)log(meName()+" (Admin) aendert "+parts.join(", ")+" ("+fmt(r.date)+")");
     return chg;
   }
   function admHead(id){if(!isAdmin())return;var r=find(id);if(!r)return;if(admSyncHead(r))persist();render();}
-  function admKann(id,uid){if(!isAdmin())return;var r=find(id);if(!r||!uid||!byId[uid])return;admSyncHead(r);var i=r.kann.indexOf(uid);if(i>=0){r.kann.splice(i,1);if(r.passed){var pp=r.passed.indexOf(uid);if(pp>=0)r.passed.splice(pp,1);}log(meName()+" (Admin) entfernt "+byId[uid].name+" aus Beworbenen ("+fmt(r.date)+")");}else{r.kann.push(uid);if(r.passed){var pp2=r.passed.indexOf(uid);if(pp2>=0)r.passed.splice(pp2,1);}log(meName()+" (Admin) fuegt "+byId[uid].name+" zu Beworbenen hinzu ("+fmt(r.date)+")");}persist();render();}
-  function admBest(id){if(!isAdmin())return;var r=find(id);if(!r)return;admSyncHead(r);var sel=document.getElementById("wp-adm-best");if(!sel)return;var v=sel.value||null;if(v&&!byId[v])return;if(v===(r.best||null)){render();return;}var prev=r.best?((byId[r.best]&&byId[r.best].name)||r.best):null;r.best=v;r.confirmNotifiedAt=null;r.remindedAt=null;if(v){r.bestAt=todayIso;if(r.kann.indexOf(v)<0)r.kann.push(v);log(meName()+" (Admin) setzt Vertretung "+byId[v].name+(prev?(" (war: "+prev+")"):"")+" ("+fmt(r.date)+")");}else{r.bestAt=null;log(meName()+" (Admin) entfernt Vertretung"+(prev?(" (war: "+prev+")"):"")+" ("+fmt(r.date)+")");}persist();render();}
+  function admKann(id,uid){if(!isAdmin())return;var r=find(id);if(!r||!uid||!byId[uid])return;admSyncHead(r);var i=r.kann.indexOf(uid);if(i>=0){r.kann.splice(i,1);dropPassed(r,uid);log(meName()+" (Admin) entfernt "+nameOf(uid)+" aus Beworbenen ("+fmt(r.date)+")");}else{r.kann.push(uid);dropPassed(r,uid);log(meName()+" (Admin) fuegt "+nameOf(uid)+" zu Beworbenen hinzu ("+fmt(r.date)+")");}persist();render();}
+  function admBest(id){if(!isAdmin())return;var r=find(id);if(!r)return;admSyncHead(r);var sel=document.getElementById("wp-adm-best");if(!sel)return;var v=sel.value||null;if(v&&!byId[v])return;if(v===(r.best||null)){render();return;}var prev=r.best?nameOf(r.best):null;r.best=v;r.confirmNotifiedAt=null;r.remindedAt=null;if(v){r.bestAt=todayIso;if(r.kann.indexOf(v)<0)r.kann.push(v);log(meName()+" (Admin) setzt Vertretung "+nameOf(v)+(prev?(" (war: "+prev+")"):"")+" ("+fmt(r.date)+")");}else{r.bestAt=null;log(meName()+" (Admin) entfernt Vertretung"+(prev?(" (war: "+prev+")"):"")+" ("+fmt(r.date)+")");}persist();render();}
   function adminPanel(r){
-    var opts=model.members.slice().sort(function(a,b){return a.order-b.order;});
-    var dvv=esc(r.dienstVon||"").replace(/"/g,"&quot;");
-    var head='<h4>Admin \u00b7 Kopfdaten</h4><div class="admgrid"><label class="admf">Datum<input type="date" id="wp-adm-date" value="'+r.date+'"></label><label class="admf">Dienst von<input type="text" id="wp-adm-dv" list="names" value="'+dvv+'"></label><label class="admf">Eingetragen am<input type="date" id="wp-adm-ein" value="'+(r.eintragVom||"")+'"></label><button type="button" class="btn sm" data-act="adm-head" data-id="'+r.id+'">\u00dcbernehmen</button></div>';
+    var opts=membersSorted(),rid=esc(r.id);
+    var head='<h4>Admin · Kopfdaten</h4><div class="admgrid"><label class="admf">Datum<input type="date" id="wp-adm-date" value="'+esc(r.date)+'"></label><label class="admf">Dienst von<input type="text" id="wp-adm-dv" list="names" value="'+esc(r.dienstVon||"")+'"></label><label class="admf">Eingetragen am<input type="date" id="wp-adm-ein" value="'+esc(r.eintragVom||"")+'"></label>'+dBtn("adm-head",r.id,"sm","Übernehmen")+'</div>';
     var kset={};(r.kann||[]).forEach(function(id){kset[id]=1;});
-    var chips=opts.map(function(m){var on=!!kset[m.id];return '<button type="button" class="admchip'+(on?" on":"")+'" data-act="adm-kann" data-id="'+r.id+'" data-uid="'+m.id+'">'+(on?"\u2713 ":"")+esc(m.name)+'</button>';}).join("");
-    var kannBlock='<h4>Admin \u00b7 Beworbene verwalten ('+(r.kann||[]).length+')</h4><div class="admchips">'+chips+'</div>';
+    var chips=opts.map(function(m){var on=!!kset[m.id];return '<button type="button" class="admchip'+(on?" on":"")+'" data-act="adm-kann" data-id="'+rid+'" data-uid="'+esc(m.id)+'">'+(on?"✓ ":"")+esc(m.name)+'</button>';}).join("");
+    var kannBlock='<h4>Admin · Beworbene verwalten ('+(r.kann||[]).length+')</h4><div class="admchips">'+chips+'</div>';
     var best=r.best||"";
-    var sel='<select id="wp-adm-best"><option value="">\u2014 keine Vertretung \u2014</option>'+opts.map(function(m){return '<option value="'+m.id+'"'+(m.id===best?" selected":"")+'>'+esc(m.name)+'</option>';}).join("")+'</select>';
-    var bestBlock='<h4>Admin \u00b7 Vertretung</h4><div class="admgrid">'+sel+'<button type="button" class="btn sm" data-act="adm-best" data-id="'+r.id+'">Setzen</button></div>';
+    var sel='<select id="wp-adm-best"><option value="">— keine Vertretung —</option>'+opts.map(function(m){return '<option value="'+esc(m.id)+'"'+(m.id===best?" selected":"")+'>'+esc(m.name)+'</option>';}).join("")+'</select>';
+    var bestBlock='<h4>Admin · Vertretung</h4><div class="admgrid">'+sel+dBtn("adm-best",r.id,"sm","Setzen")+'</div>';
     return '<div class="admbox">'+head+kannBlock+bestBlock+'</div>';
   }
   function detailHtml(r){
@@ -553,28 +683,56 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     var metaLine='Dienst von <b>'+esc(r.dienstVon||"—")+'</b>'+(r.eintragVom?" · eingetragen am "+fmt(r.eintragVom):"")+(!r.best&&r.date>=todayIso?(" · Zusage "+(earliest>todayIso?("ab "+fmt(earliest)):"jetzt möglich")):"");
     var sg=suggestFor(r,byId,counts),pss=r.passed||[];
     var apps=sortByLoad(r.kann,counts,sg&&sg.pick,pss).map(function(id){
-      var m=byId[id],nm=m?m.name:id,c=counts[id]||0,tags="";
+      var nm=nameOf(id),c=counts[id]||0,tags="";
       if(sg&&sg.pick===id)tags+='<span class="dtag pick">Vorschlag</span>';else if(sg&&sg.tied.indexOf(id)>=0)tags+='<span class="dtag tie">gleichauf</span>';
       if(pss.indexOf(id)>=0)tags+='<span class="dtag pass">weitergegeben</span>';
       if(id===cur)tags+='<span class="dtag me">du</span>';
-      return '<li><span class="dav'+(sg&&sg.pick===id?" sug":"")+'">'+initials(nm)+'</span><span class="dnm">'+esc(nm)+'</span><span class="dcnt">'+c+' Dienste '+curYear+'</span>'+tags+'</li>';
+      if(!byId[id])tags+='<span class="dtag pass">nicht mehr im Pool</span>';
+      return '<li><span class="dav'+(sg&&sg.pick===id?" sug":"")+'">'+esc(initials(nm))+'</span><span class="dnm">'+esc(nm)+'</span><span class="dcnt">'+c+' Dienste '+curYear+'</span>'+tags+'</li>';
     }).join("");
     var appsBlock='<h4>Beworben ('+r.kann.length+')</h4>'+(r.kann.length?'<ul class="dapp">'+apps+'</ul>':'<div class="dempty">Noch niemand hat „kann“ markiert.</div>');
-    var subBlock="";if(r.best){var bm=byId[r.best];subBlock='<h4>Vertretung</h4><div class="dsub"><span class="dav ok">'+initials(bm?bm.name:r.best)+'</span><span class="dnm">'+esc(bm?bm.name:r.best)+'</span>'+(r.bestAt?'<span class="dcnt">zugesagt am '+fmt(r.bestAt)+'</span>':"")+'</div>';}
-    var tl=[];if(r.eintragVom)tl.push([r.eintragVom,"Eingetragen"]);if(r.bestAt&&r.best)tl.push([r.bestAt,"Zusage durch "+((byId[r.best]&&byId[r.best].name)||r.best)]);if(r.confirmNotifiedAt)tl.push([r.confirmNotifiedAt,"Ersteller benachrichtigt"]);if(r.remindedAt)tl.push([r.remindedAt,"Erinnerung verschickt"]);
+    var subBlock="";if(r.best){var bn=nameOf(r.best);subBlock='<h4>Vertretung</h4><div class="dsub"><span class="dav ok">'+esc(initials(bn))+'</span><span class="dnm">'+esc(bn)+'</span>'+(byId[r.best]?"":'<span class="dtag pass">nicht mehr im Pool</span>')+(r.bestAt?'<span class="dcnt">zugesagt am '+fmt(r.bestAt)+'</span>':"")+'</div>';}
+    var tl=[];if(r.eintragVom)tl.push([r.eintragVom,"Eingetragen"]);if(r.poolRemindedAt)tl.push([r.poolRemindedAt,"Pool erinnert"]);if(r.bestAt&&r.best)tl.push([r.bestAt,"Zusage durch "+nameOf(r.best)]);if(r.confirmNotifiedAt)tl.push([r.confirmNotifiedAt,"Ersteller benachrichtigt"]);if(r.remindedAt)tl.push([r.remindedAt,"Erinnerung verschickt"]);
     tl.sort(function(a,b){return a[0]<b[0]?-1:(a[0]>b[0]?1:0);});
     var tlBlock=tl.length?('<h4>Verlauf</h4><ul class="dtl">'+tl.map(function(x){return '<li><span class="dtd">'+fmt(x[0])+'</span>'+esc(x[1])+'</li>';}).join("")+'</ul>'):"";
     var body='<div class="wp-modal-b"><div class="dmeta">'+metaLine+'</div>'+appsBlock+subBlock+tlBlock+(isAdmin()?adminPanel(r):"")+'</div>';
     return '<div class="wp-modal-ov" data-modal-close="1"></div><div class="wp-modal" role="dialog" aria-modal="true"><button type="button" class="wp-modal-x" data-modal-close="1" aria-label="Schließen">×</button>'+head+body+'<div class="wp-modal-f">'+detailActions(r)+'</div></div>';
   }
-  function myRequests(){return model.requests.filter(function(r){return isOwner(r);}).sort(function(a,b){return a.date<b.date?-1:1;});}function loeschen(id){var r=find(id);if(!r)return;var bnm=(r.best&&byId[r.best])?byId[r.best].name:r.best;if(!canDelete(r)){if(r.best){alert("Dieser Dienst ist definitiv zugesagt (Vertretung "+bnm+") und kann nicht geloescht werden. Zuerst freigeben.");}else{alert("Nur der Ersteller oder ein Admin kann dieses Gesuch loeschen.");}return;}var viaAdmin=isAdmin()&&(r.best||!isOwner(r));var q=r.best?("ACHTUNG: Dienst am "+fmt(r.date)+" ist zugesagt (Vertretung "+bnm+"). Als Admin wirklich loeschen?"):("Dienst am "+fmt(r.date)+(r.dienstVon?" (Dienst von "+r.dienstVon+")":"")+" wirklich loeschen?");if(!confirm(q))return;model.requests=model.requests.filter(function(x){return x.id!==id;});log(meName()+(viaAdmin?" (Admin)":"")+" loescht Dienst "+fmt(r.date)+(r.best?" [war zugesagt: "+bnm+"]":""));closeDetail();persist();render();}function myReqCard(r,counts){counts=counts||yearCounts(model,curYear);var st=statusOf(r,todayIso),hn=holiday(r.date),n=days(todayIso,r.date);var when=weekday(r.date)+" "+fmt(r.date);var off=r.kann.length;var __sg=suggestFor(r,byId,counts);var names=sortByLoad(r.kann,counts,__sg&&__sg.pick,r.passed).map(function(id){return byId[id]?byId[id].name:id;});var earliest=confirmFrom(r);var pill,info,cls;if(r.best){cls=" rec";pill='<span class="pill rec">zugesagt</span>';info="Vertretung: <b>"+(byId[r.best]?byId[r.best].name:r.best)+"</b>"+(r.bestAt?" (am "+fmt(r.bestAt)+")":"");}else if(r.date<todayIso){cls=" crit";pill='<span class="pill crit">ohne Vertretung</span>';info="Termin vorbei, keine Vertretung gefunden.";}else if(st==="kritisch"){cls=" crit";pill='<span class="pill crit">kritisch</span>';info="Noch keine Zusage, Termin in "+n+" Tagen.";}else{cls="";var ph=confirmAllowed(r)?"Zusagephase":"Sammelphase";pill='<span class="pill due">'+ph+'</span>';info="Noch keine Zusage, Pool kann sich melden.";}var tl=["Eintrag "+(r.eintragVom?fmt(r.eintragVom):"-")];if(!r.best&&r.date>=todayIso)tl.push("Zusage "+(earliest>todayIso?("ab "+fmt(earliest)):"jetzt moeglich"));tl.push("Dienst "+fmt(r.date)+(r.date>=todayIso?(" (in "+n+" Tagen)"):""));var offline=("<b>"+off+"</b> Angebot"+(off===1?"":"e")+(off?": "+names.join(", "):""));var acts="";if(!r.best&&r.date>=todayIso)acts+='<button class="btn sm" data-act="pool" data-id="'+r.id+'">Pool erinnern</button>';if(!r.best)acts+='<button class="btn warn sm" data-act="del" data-id="'+r.id+'">zurückziehen</button>';return '<div class="icard'+cls+' clk" data-detail="'+r.id+'"><div><div class="t">'+pill+' '+when+(hn?" · "+hn:"")+'</div><div class="m">'+info+" · "+offline+'</div><div class="m">'+tl.join(" · ")+'</div></div><div class="iacts">'+acts+'</div></div>';}function renderMyReq(){var el=document.getElementById("myreq");if(!el)return;var mine=myRequests();var __mc=yearCounts(model,curYear);var body=mine.length?mine.map(function(r){return myReqCard(r,__mc);}).join(""):'<div class="empty">Du suchst aktuell keine Vertretung.</div>';el.innerHTML='<div class="card"><h2>Meine Vertretungsgesuche'+(mine.length?" ("+mine.length+")":"")+'</h2>'+body+'</div>';}var expYear=null;function expYears(){var ys={};model.requests.forEach(function(r){if(r.date)ys[r.date.slice(0,4)]=1;});var arr=Object.keys(ys).map(Number).sort(function(a,b){return b-a;});if(arr.indexOf(curYear)<0)arr.unshift(curYear);return arr;}function expData(year){return model.requests.filter(function(r){return r.date&&+r.date.slice(0,4)===year;}).sort(function(a,b){return a.date<b.date?-1:1;});}function expLabel(r){var st=statusOf(r,todayIso);var l=statusMeta(st)[2];if(st==="vergeben")l="zugesagt";return l;}function expStats(year){var data=expData(year);var bsm={};data.forEach(function(r){var l=expLabel(r);bsm[l]=(bsm[l]||0)+1;});var order=["zugesagt","Sammelphase","Zusagephase","kritisch","durchgerutscht","erledigt"];var byStatus=[];order.forEach(function(l){if(bsm[l])byStatus.push([l,bsm[l]]);});Object.keys(bsm).forEach(function(l){if(order.indexOf(l)<0)byStatus.push([l,bsm[l]]);});var uc={};data.forEach(function(r){if(r.best)uc[r.best]=(uc[r.best]||0)+1;});var byUser=model.members.map(function(m){return [m.name,uc[m.id]||0];}).sort(function(a,b){return b[1]-a[1]||a[0].localeCompare(b[0]);});return {total:data.length,byStatus:byStatus,byUser:byUser};}function statHtml(year){var s=expStats(year);var st=s.byStatus.map(function(x){return x[0]+": <b>"+x[1]+"</b>";}).join(" · ");var us=s.byUser.map(function(x){return "<li>"+x[0]+" — <b>"+x[1]+"</b></li>";}).join("");return '<div class="statbox"><h3>Statistik '+year+'</h3><div class="m">Gesamt: <b>'+s.total+'</b> Dienste</div><div class="m">'+st+'</div><div class="m" style="margin-top:6px">Ranking (zugesagte Dienste):</div><ol class="rank">'+us+'</ol></div>';}function exportRows(year){var rows=[["Jahr","Datum","Wochentag","KW","Feiertag","Dienst von","Status","Vertretung","Angebote","Interessenten"]];expData(year).forEach(function(r){var b=r.best?(byId[r.best]?byId[r.best].name:r.best):"";var names=sortByLoad(r.kann,yearCounts(model,year)).map(function(id){return byId[id]?byId[id].name:id;}).join(", ");rows.push([year,fmt(r.date),weekday(r.date),isoWeek(r.date),holiday(r.date)||"",r.dienstVon||"",expLabel(r),b,r.kann.length,names]);});var __s=expStats(year);rows.push([]);rows.push(["Statistik "+year]);rows.push(["Gesamt",__s.total]);__s.byStatus.forEach(function(x){rows.push(["Status: "+x[0],x[1]]);});rows.push([]);rows.push(["Ranking (zugesagte Dienste)"]);__s.byUser.forEach(function(x){rows.push([x[0],x[1]]);});return rows;}function csvCell(v){v=(v==null?"":String(v));return /[";\n\r]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v;}function downloadCsv(year){var rows=exportRows(year);var csv=rows.map(function(r){return r.map(csvCell).join(";");}).join("\r\n");var blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="vertretungspool_"+year+".csv";document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1500);}function renderExport(){var sel=document.getElementById("exp-year"),tb=document.getElementById("exp-table");if(!sel||!tb)return;var years=expYears();if(expYear==null||years.indexOf(expYear)<0)expYear=(years.indexOf(curYear)>=0?curYear:years[0]);sel.innerHTML=years.map(function(y){return '<option value="'+y+'"'+(y===expYear?" selected":"")+">"+y+"</option>";}).join("");var data=expData(expYear);if(!data.length){tb.innerHTML='<div class="empty">Keine Dienste im Jahr '+expYear+'.</div>';return;}var zug=data.filter(function(r){return r.best;}).length,offen=data.filter(function(r){return !r.best&&r.date>=todayIso;}).length,durch=data.filter(function(r){return !r.best&&r.date<todayIso;}).length;var kn=data.reduce(function(a,r){return a+((r.kann||[]).length);},0),kd=data.filter(function(r){return (r.kann||[]).length;}).length;var head='<tr><th>Datum</th><th>KW</th><th>Dienst von</th><th>Status</th><th>Vertretung</th><th>Angebote</th></tr>';var body=data.map(function(r){var st=statusOf(r,todayIso);var hn=holiday(r.date);var cls=(st==="durchgerutscht"||st==="kritisch")?"x-crit":(r.best?"x-ok":"");return '<tr class="'+cls+'"><td>'+weekday(r.date)+" "+fmt(r.date)+(hn?" · "+hn:"")+'</td><td>'+isoWeek(r.date)+'</td><td>'+(r.dienstVon||"—")+'</td><td>'+expLabel(r)+'</td><td>'+(r.best?(byId[r.best]?byId[r.best].name:r.best):"—")+'</td><td>'+r.kann.length+'</td></tr>';}).join("");tb.innerHTML='<div class="m" style="margin:4px 0 8px">'+data.length+" Dienste · "+zug+" zugesagt · "+offen+" offen · "+durch+" durchgerutscht · "+kn+" kann gesamt ("+kd+" Dienste mit Interesse)"+'</div><table class="exptbl">'+head+body+"</table>"+statHtml(expYear);}function feedEvent(type,r){var who=byId[cur]?meName():cur;var dd=fmt(r.date);var txt=(type==="eintragen")?(who+" kann am "+dd+" vertreten."):(who+" sucht Vertretung am "+dd+".");log("[Feed] "+txt);try{requestActivityPing("Vertretungspool aktualisiert");}catch(e){log("Feed-Fehler: "+e);}}function renderA(counts){
-    if(isGuest()){document.getElementById("view-a").innerHTML='<div class="card"><div class="empty">Die Inbox ist nur f\u00fcr Poolmitglieder. Unter \u201eListe\u201c siehst du alle Termine.</div></div>';return;}
-    var fut=model.requests.filter(function(r){return r.date>=todayIso;}).sort(function(a,b){return a.date<b.date?-1:1;});
-    var meine=[],vors=[],krit=[],mit=[],kann=[],beob=[];
-    fut.forEach(function(r){
+  function myRequests(){return model.requests.filter(isOwner).sort(byDateAsc);}function loeschen(id){var r=find(id);if(!r)return;var bnm=r.best?nameOf(r.best):"";if(!canDelete(r)){if(r.best){alert("Dieser Dienst ist definitiv zugesagt (Vertretung "+bnm+") und kann nicht geloescht werden. Zuerst freigeben.");}else{alert("Nur der Ersteller oder ein Admin kann dieses Gesuch loeschen.");}return;}var viaAdmin=isAdmin()&&(r.best||!isOwner(r));var q=r.best?("ACHTUNG: Dienst am "+fmt(r.date)+" ist zugesagt (Vertretung "+bnm+"). Als Admin wirklich loeschen?"):("Dienst am "+fmt(r.date)+(r.dienstVon?" (Dienst von "+r.dienstVon+")":"")+" wirklich loeschen?");if(!confirm(q))return;model.requests=model.requests.filter(function(x){return x.id!==id;});log(meName()+(viaAdmin?" (Admin)":"")+" loescht Dienst "+fmt(r.date)+(r.best?" [war zugesagt: "+bnm+"]":""));closeDetail();persist();render();}function myReqCard(r,counts){
+    counts=counts||yearCounts(model,curYear);
+    var st=statusOf(r,todayIso),hn=holiday(r.date),n=days(todayIso,r.date),off=r.kann.length,sg=suggestFor(r,byId,counts);
+    var names=sortByLoad(r.kann,counts,sg&&sg.pick,r.passed).map(function(id){return esc(nameOf(id));});
+    var earliest=confirmFrom(r),pill,info,cls;
+    if(r.best){cls=" rec";pill='<span class="pill rec">zugesagt</span>';info="Vertretung: <b>"+esc(nameOf(r.best))+"</b>"+(r.bestAt?" (am "+fmt(r.bestAt)+")":"");}
+    else if(r.date<todayIso){cls=" crit";pill='<span class="pill crit">ohne Vertretung</span>';info="Termin vorbei, keine Vertretung gefunden.";}
+    else if(st==="kritisch"){cls=" crit";pill='<span class="pill crit">kritisch</span>';info="Noch keine Zusage, Termin in "+n+" Tagen.";}
+    else{cls="";pill='<span class="pill due">'+(confirmAllowed(r)?"Zusagephase":"Sammelphase")+'</span>';info="Noch keine Zusage, Pool kann sich melden.";}
+    var tl=["Eintrag "+(r.eintragVom?fmt(r.eintragVom):"-")];
+    if(!r.best&&r.date>=todayIso)tl.push("Zusage "+(earliest>todayIso?("ab "+fmt(earliest)):"jetzt moeglich"));
+    tl.push("Dienst "+fmt(r.date)+(r.date>=todayIso?(" (in "+n+" Tagen)"):""));
+    var offline="<b>"+off+"</b> Angebot"+(off===1?"":"e")+(off?": "+names.join(", "):"");
+    var acts="";
+    if(!r.best&&r.date>=todayIso)acts+=dBtn("pool",r.id,"sm","Pool erinnern");
+    if(!r.best)acts+=dBtn("del",r.id,"warn sm","zurückziehen");
+    return '<div class="icard'+cls+' clk" data-detail="'+esc(r.id)+'"><div><div class="t">'+pill+' '+weekday(r.date)+" "+fmt(r.date)+(hn?" · "+hn:"")+'</div><div class="m">'+info+" · "+offline+'</div><div class="m">'+tl.join(" · ")+'</div></div><div class="iacts">'+acts+'</div></div>';
+  }function renderMyReq(counts){var el=document.getElementById("myreq");if(!el)return;var mine=myRequests();counts=counts||yearCounts(model,curYear);var body=mine.length?mine.map(function(r){return myReqCard(r,counts);}).join(""):'<div class="empty">Du suchst aktuell keine Vertretung.</div>';el.innerHTML='<div class="card"><h2>Meine Vertretungsgesuche'+(mine.length?" ("+mine.length+")":"")+'</h2>'+body+'</div>';}var expYear=null;function expYears(){var ys={};model.requests.forEach(function(r){if(r.date)ys[r.date.slice(0,4)]=1;});var arr=Object.keys(ys).map(Number).sort(function(a,b){return b-a;});if(arr.indexOf(curYear)<0)arr.unshift(curYear);return arr;}function expData(year){return model.requests.filter(function(r){return r.date&&+r.date.slice(0,4)===year;}).sort(byDateAsc);}function expLabel(r){var st=statusOf(r,todayIso);var l=statusMeta(st)[2];if(st==="vergeben")l="zugesagt";return l;}function expStats(year){var data=expData(year);var bsm={};data.forEach(function(r){var l=expLabel(r);bsm[l]=(bsm[l]||0)+1;});var order=["zugesagt","Sammelphase","Zusagephase","kritisch","durchgerutscht","erledigt"];var byStatus=[];order.forEach(function(l){if(bsm[l])byStatus.push([l,bsm[l]]);});Object.keys(bsm).forEach(function(l){if(order.indexOf(l)<0)byStatus.push([l,bsm[l]]);});var uc={};data.forEach(function(r){if(r.best)uc[r.best]=(uc[r.best]||0)+1;});var byUser=model.members.map(function(m){return [m.name,uc[m.id]||0];}).sort(function(a,b){return b[1]-a[1]||a[0].localeCompare(b[0]);});return {total:data.length,byStatus:byStatus,byUser:byUser};}function statHtml(year){var s=expStats(year);var st=s.byStatus.map(function(x){return esc(x[0])+": <b>"+x[1]+"</b>";}).join(" · ");var us=s.byUser.map(function(x){return "<li>"+esc(x[0])+" — <b>"+x[1]+"</b></li>";}).join("");return '<div class="statbox"><h3>Statistik '+year+'</h3><div class="m">Gesamt: <b>'+s.total+'</b> Dienste</div><div class="m">'+st+'</div><div class="m" style="margin-top:6px">Ranking (zugesagte Dienste):</div><ol class="rank">'+us+'</ol></div>';}function exportRows(year){var rows=[["Jahr","Datum","Wochentag","KW","Feiertag","Dienst von","Status","Vertretung","Angebote","Interessenten"]],yc=yearCounts(model,year);expData(year).forEach(function(r){var names=sortByLoad(r.kann,yc).map(nameOf).join(", ");rows.push([year,fmt(r.date),weekday(r.date),isoWeek(r.date),holiday(r.date)||"",r.dienstVon||"",expLabel(r),(r.best?nameOf(r.best):""),r.kann.length,names]);});var st=expStats(year);rows.push([]);rows.push(["Statistik "+year]);rows.push(["Gesamt",st.total]);st.byStatus.forEach(function(x){rows.push(["Status: "+x[0],x[1]]);});rows.push([]);rows.push(["Ranking (zugesagte Dienste)"]);st.byUser.forEach(function(x){rows.push([x[0],x[1]]);});return rows;}function csvCell(v){v=(v==null?"":String(v));return /[";\n\r]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v;}function downloadCsv(year){var rows=exportRows(year);var csv=rows.map(function(r){return r.map(csvCell).join(";");}).join("\r\n");var blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download="vertretungspool_"+year+".csv";document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url);},1500);}function exportOpen(){var d=document.getElementById("exp-details");return !!(d&&d.open);}
+  function renderExport(){
+    var sel=document.getElementById("exp-year"),tb=document.getElementById("exp-table");if(!sel||!tb)return;
+    var years=expYears();if(expYear==null||years.indexOf(expYear)<0)expYear=(years.indexOf(curYear)>=0?curYear:years[0]);
+    sel.innerHTML=years.map(function(y){return '<option value="'+y+'"'+(y===expYear?" selected":"")+">"+y+"</option>";}).join("");
+    var data=expData(expYear);if(!data.length){tb.innerHTML='<div class="empty">Keine Dienste im Jahr '+expYear+'.</div>';return;}
+    var zug=0,offen=0,durch=0,kn=0,kd=0;
+    data.forEach(function(r){if(r.best)zug++;else if(r.date>=todayIso)offen++;else durch++;var k=(r.kann||[]).length;kn+=k;if(k)kd++;});
+    var head='<tr><th>Datum</th><th>KW</th><th>Dienst von</th><th>Status</th><th>Vertretung</th><th>Angebote</th></tr>';
+    var body=data.map(function(r){var st=statusOf(r,todayIso),hn=holiday(r.date);var cls=(st==="durchgerutscht"||st==="kritisch")?"x-crit":(r.best?"x-ok":"");return '<tr class="'+cls+'"><td>'+weekday(r.date)+" "+fmt(r.date)+(hn?" · "+hn:"")+'</td><td>'+isoWeek(r.date)+'</td><td>'+esc(r.dienstVon||"—")+'</td><td>'+esc(expLabel(r))+'</td><td>'+(r.best?esc(nameOf(r.best)):"—")+'</td><td>'+r.kann.length+'</td></tr>';}).join("");
+    tb.innerHTML='<div class="m" style="margin:4px 0 8px">'+data.length+" Dienste · "+zug+" zugesagt · "+offen+" offen · "+durch+" durchgerutscht · "+kn+" kann gesamt ("+kd+" Dienste mit Interesse)"+'</div><table class="exptbl">'+head+body+"</table>"+statHtml(expYear);
+  }function feedEvent(type,r){var who=meName();var dd=fmt(r.date);var txt=(type==="eintragen")?(who+" kann am "+dd+" vertreten."):(who+" sucht Vertretung am "+dd+".");log("[Feed] "+txt);try{requestActivityPing("Vertretungspool aktualisiert");}catch(e){log("Feed-Fehler: "+e);}}function renderA(counts){
+    if(isGuest()){document.getElementById("view-a").innerHTML='<div class="card"><div class="empty">Die Inbox ist nur für Poolmitglieder. Unter „Liste“ siehst du alle Termine.</div></div>';return;}
+    var meine=[],vors=[],krit=[],mit=[],kann=[],beob=[],sgs={};
+    futureReqs().forEach(function(r){
       if(r.best===cur){meine.push(r);return;}
       if(r.best)return;
-      var s=suggestFor(r,byId,counts),st=statusOf(r,todayIso);
+      var s=suggestFor(r,byId,counts),st=statusOf(r,todayIso);sgs[r.id]=s;
       if(st==="kritisch"){krit.push(r);return;}
       if(s&&s.pick===cur){vors.push(r);return;}
       if(s&&s.tied.indexOf(cur)>=0){mit.push(r);return;}
@@ -583,42 +741,60 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     });
     var nothing=!meine.length&&!vors.length&&!krit.length&&!mit.length&&!kann.length;
     var html="";
-    html+=section("Vorschlag für dich",vors,"vorschlag",counts,"Aktuell kein Vorschlag für dich.");
-    html+=section("Kritisch — bald ohne Vertretung",krit,"kritisch",counts,"Nichts Kritisches.");if(mit.length)html+=section("Gleichauf — bitte abstimmen oder zusagen",mit,"mit",counts,"");
-    html+=section("Bitte um dein „kann“",kann,"kann",counts,"Du hast alle offenen Gesuche gesehen.");
+    html+=section("Vorschlag für dich",vors,"vorschlag",counts,"Aktuell kein Vorschlag für dich.",sgs);
+    html+=section("Kritisch — bald ohne Vertretung",krit,"kritisch",counts,"Nichts Kritisches.",sgs);
+    if(mit.length)html+=section("Gleichauf — bitte abstimmen oder zusagen",mit,"mit",counts,"",sgs);
+    html+=section("Bitte um dein „kann“",kann,"kann",counts,"Du hast alle offenen Gesuche gesehen.",sgs);
     html+=section("Deine bestätigten Dienste",meine,"meine",counts,"Du hast aktuell keine Dienste übernommen.");
-    if(beob.length)html+=section("Du hast Interesse bekundet (wartet)",beob,"beob",counts,"");
-    if(nothing)html='<div class="card"><div class="empty">Für '+meName()+' ist aktuell nichts zu tun. ✔</div></div>'+html;
+    if(beob.length)html+=section("Du hast Interesse bekundet (wartet)",beob,"beob",counts,"",sgs);
+    if(nothing)html='<div class="card"><div class="empty">Für '+esc(meName())+' ist aktuell nichts zu tun. ✔</div></div>'+html;
     document.getElementById("view-a").innerHTML=html;
   }
 
   // ---- Render: Ansicht C (Liste) ----
-  function statusMeta(st){return {sammeln:["--c-sammeln","b-sammeln","Sammelphase"],"vergabe-offen":["--c-vergabe","b-vergabe","Zusagephase"],kritisch:["--c-kritisch","b-kritisch","kritisch"],vergeben:["--c-vergeben","b-vergeben","vergeben"],erledigt:["--c-erledigt","b-erledigt","erledigt"],durchgerutscht:["--c-durch","b-kritisch","durchgerutscht - nicht vergeben"]}[st];}
-  function actionsHtml(r,st){if(r.date<todayIso)return "";if(st==="vergeben"){return '<div class="acts">'+(r.best===cur?'<button class="btn warn sm" data-act="frei" data-id="'+r.id+'">freigeben</button><button class="btn sm" data-act="remind" data-id="'+r.id+'">'+(r.remindedAt?"erneut erinnern":"erinnern")+'</button>':zusageHtml(r,"sm","zusagen (ersetzen)"))+'</div>';}var has=r.kann.indexOf(cur)>=0;return '<div class="acts"><button class="btn sm'+(has?" on":"")+'" data-act="kann" data-id="'+r.id+'">'+(has?"✓ kann":"+ kann")+'</button>'+zusageHtml(r,"prim sm","zusagen")+'</div>';}
-  function rowHtml(r,counts){var st=statusOf(r,todayIso),meta=statusMeta(st),hn=holiday(r.date),sug=suggestFor(r,byId,counts);var badge=meta[2];if(st==="vergeben"&&r.best)badge="Vertretung: "+(byId[r.best]?byId[r.best].name:r.best);else if(sug&&(st==="vergabe-offen"||st==="kritisch"||st==="sammeln"))badge=meta[2]+" · Vorschlag: "+sugText(sug);var cd="";if(r.date>=todayIso){var n=days(todayIso,r.date);cd=n===0?"heute":(n===1?"morgen":"in "+n+" Tagen");}var ml="Dienst von "+(r.dienstVon||"—")+(r.eintragVom?" · Eintrag "+fmt(r.eintragVom):"")+(cd?" · "+cd:"");if(sug&&st!=="vergeben"){if(sug.pick===cur)ml+=' · <span class="dran">du bist vorgeschlagen</span>';else if(sug.tied.indexOf(cur)>=0)ml+=' · <span class="dran">du bist gleichauf</span>';}var __ks=sortByLoad(r.kann,counts,sug&&sug.pick,r.passed);if(r.best&&__ks.indexOf(r.best)>0)__ks=[r.best].concat(__ks.filter(function(x){return x!==r.best;}));var chips=__ks.map(function(id,i){var m=byId[id];return '<span class="av'+(sug&&id===sug.pick?" sug":"")+'" style="z-index:'+(__ks.length-i)+'" title="'+esc(m?m.name:id)+' ('+(counts[id]||0)+((counts[id]||0)===1?' Dienst':' Dienste')+')">'+initials(m?m.name:id)+'</span>';}).join("");if(!r.kann.length)chips='<span class="em">niemand</span>';return '<div class="row clk" data-detail="'+r.id+'"><div class="rail" style="background:var('+meta[0]+')"></div><div class="rbody"><div class="rleft"><div class="dline">'+weekday(r.date)+" "+fmt(r.date)+'<span class="kw">KW'+isoWeek(r.date)+'</span>'+(hn?'<span class="feier">'+hn+'</span>':'')+'</div><div><span class="badge '+meta[1]+'">'+badge+'</span></div><div class="meta">'+ml+'</div></div><div class="rright"><div class="avs">'+chips+'</div>'+actionsHtml(r,st)+'</div></div></div>';}
-  function grouped(list,counts){var out="",c=null;list.forEach(function(r){var ml=MON[+r.date.slice(5,7)-1]+" "+r.date.slice(0,4);if(ml!==c){c=ml;out+='<div class="month">'+ml+'</div>';}out+=rowHtml(r,counts);});return out||'<div class="em">keine Termine</div>';}
-  function renderC(counts){var fut=model.requests.filter(function(r){return r.date>=todayIso;}).sort(function(a,b){return a.date<b.date?-1:1;});var past=model.requests.filter(function(r){return r.date<todayIso;}).sort(function(a,b){return a.date<b.date?1:-1;});document.getElementById("future").innerHTML=grouped(fut,counts);document.getElementById("past").innerHTML=grouped(past,counts);var durch=past.filter(function(r){return !r.best;}).length;document.querySelector("#pastwrap summary").innerHTML="Vergangene Termine anzeigen ("+past.length+")"+(durch?' — <span style="color:var(--danger)">'+durch+' durchgerutscht</span>':"");}
+  var STATUS_META={sammeln:["--c-sammeln","b-sammeln","Sammelphase"],"vergabe-offen":["--c-vergabe","b-vergabe","Zusagephase"],kritisch:["--c-kritisch","b-kritisch","kritisch"],vergeben:["--c-vergeben","b-vergeben","vergeben"],erledigt:["--c-erledigt","b-erledigt","erledigt"],durchgerutscht:["--c-durch","b-kritisch","durchgerutscht - nicht vergeben"]};
+  function statusMeta(st){return STATUS_META[st];}
+  function actionsHtml(r,st){if(r.date<todayIso)return "";if(st==="vergeben")return '<div class="acts">'+(r.best===cur?dBtn("frei",r.id,"warn sm","freigeben")+dBtn("remind",r.id,"sm",(r.remindedAt?"erneut erinnern":"erinnern")):zusageHtml(r,"sm","zusagen (ersetzen)"))+'</div>';return '<div class="acts">'+kannBtn(r)+zusageHtml(r,"prim sm","zusagen")+'</div>';}
+  function rowHtml(r,counts){
+    var st=statusOf(r,todayIso),meta=statusMeta(st),hn=holiday(r.date),sug=suggestFor(r,byId,counts);
+    var badge=meta[2];
+    if(st==="vergeben"&&r.best)badge="Vertretung: "+esc(nameOf(r.best));
+    else if(sug&&(st==="vergabe-offen"||st==="kritisch"||st==="sammeln"))badge=meta[2]+" · Vorschlag: "+esc(sugText(sug));
+    var ml="Dienst von "+esc(r.dienstVon||"—")+(r.eintragVom?" · Eintrag "+fmt(r.eintragVom):"")+(r.date>=todayIso?" · "+inDays(days(todayIso,r.date)):"");
+    if(sug&&st!=="vergeben"){if(sug.pick===cur)ml+=' · <span class="dran">du bist vorgeschlagen</span>';else if(sug.tied.indexOf(cur)>=0)ml+=' · <span class="dran">du bist gleichauf</span>';}
+    var ks=sortByLoad(r.kann,counts,sug&&sug.pick,r.passed);
+    if(r.best&&ks.indexOf(r.best)>0)ks=[r.best].concat(ks.filter(function(x){return x!==r.best;}));
+    var chips=ks.map(function(id,i){var nm=nameOf(id),c=counts[id]||0;return '<span class="av'+(sug&&id===sug.pick?" sug":"")+'" style="z-index:'+(ks.length-i)+'" title="'+esc(nm)+' ('+c+(c===1?' Dienst':' Dienste')+')">'+esc(initials(nm))+'</span>';}).join("");
+    if(!r.kann.length)chips='<span class="em">niemand</span>';
+    return '<div class="row clk" data-detail="'+esc(r.id)+'"><div class="rail" style="background:var('+meta[0]+')"></div><div class="rbody"><div class="rleft"><div class="dline">'+weekday(r.date)+" "+fmt(r.date)+'<span class="kw">KW'+isoWeek(r.date)+'</span>'+(hn?'<span class="feier">'+hn+'</span>':'')+'</div><div><span class="badge '+meta[1]+'">'+badge+'</span></div><div class="meta">'+ml+'</div></div><div class="rright"><div class="avs">'+chips+'</div>'+actionsHtml(r,st)+'</div></div></div>';
+  }
+  function grouped(list,counts){var out="",c=null;list.forEach(function(r){var ml=(MON[+String(r.date).slice(5,7)-1]||"")+" "+esc(String(r.date).slice(0,4));if(ml!==c){c=ml;out+='<div class="month">'+ml+'</div>';}out+=rowHtml(r,counts);});return out||'<div class="em">keine Termine</div>';}
+  function renderC(counts){var fut=futureReqs(),past=pastReqs();document.getElementById("future").innerHTML=grouped(fut,counts);document.getElementById("past").innerHTML=grouped(past,counts);var durch=past.filter(function(r){return !r.best;}).length;document.querySelector("#pastwrap summary").innerHTML="Vergangene Termine anzeigen ("+past.length+")"+(durch?' — <span style="color:var(--danger)">'+durch+' durchgerutscht</span>':"");}
 
   function render(){
     refreshToday();
-    var counts=yearCounts(model,curYear);
-    var __w=document.getElementById("who");if(IS_CONF){__w.innerHTML="<option>"+(curName||cur)+"</option>";__w.disabled=true;}else{__w.innerHTML=model.members.slice().sort(function(a,b){return a.order-b.order;}).map(function(m){return '<option value="'+m.id+'"'+(m.id===cur?' selected':'')+'>'+m.name+'</option>';}).join("");}
-    var __ga=isAdmin();var __rb=document.getElementById("resetbtn");if(__rb)__rb.style.display=__ga?"":"none";var __sb=document.getElementById("selftestbtn");if(__sb)__sb.style.display=__ga?"":"none";var __sc=document.getElementById("selftest2card");if(__sc)__sc.style.display=__ga?"":"none";var __dg=document.getElementById("diagcard");if(__dg)__dg.style.display=IS_CONF?"none":"";var __cb=document.getElementById("cleanbtn");if(__cb)__cb.style.display=__ga?"":"none";var __dc=document.getElementById("dscard");if(__dc)__dc.style.display=(__ga&&IS_CONF)?"":"none";var __g1=document.getElementById("g-adm-ein");if(__g1)__g1.style.display=__ga?"":"none";var __g2=document.getElementById("g-adm-best");if(__g2)__g2.style.display=__ga?"":"none";
-    var minc=Math.min.apply(null,model.members.map(function(m){return counts[m.id]||0;}));
-    document.getElementById("counts").innerHTML=model.members.slice().sort(function(a,b){return a.order-b.order;}).map(function(m){var c=counts[m.id]||0;return '<span class="chip'+(c===minc?" lo":"")+(m.id===cur?" me":"")+'"><b>'+m.name+'</b><span class="n">'+c+'</span></span>';}).join("");
-    var __cy=document.getElementById("cy");if(__cy)__cy.textContent=curYear;
-    renderCfg();renderGuide();
-    renderMyReq();renderExport();renderA(counts);renderC(counts);
+    var counts=yearCounts(model,curYear),ms=membersSorted(),adm=isAdmin();
+    function show(id,on){var el=document.getElementById(id);if(el)el.style.display=on?"":"none";}
+    var w=document.getElementById("who");
+    if(IS_CONF){w.innerHTML="<option>"+esc(curName||cur)+"</option>";w.disabled=true;}
+    else{w.innerHTML=ms.map(function(m){return '<option value="'+esc(m.id)+'"'+(m.id===cur?' selected':'')+'>'+esc(m.name)+'</option>';}).join("");}
+    show("resetbtn",adm&&!IS_CONF);show("selftestbtn",adm);show("selftest2card",adm);show("cleanbtn",adm);show("dscard",adm&&IS_CONF);show("g-adm-ein",adm);show("g-adm-best",adm);
+    var minc=Math.min.apply(null,ms.map(function(m){return counts[m.id]||0;}));
+    document.getElementById("counts").innerHTML=ms.map(function(m){var c=counts[m.id]||0;return '<span class="chip'+(c===minc?" lo":"")+(m.id===cur?" me":"")+'"><b>'+esc(m.name)+'</b><span class="n">'+c+'</span></span>';}).join("");
+    var cy=document.getElementById("cy");if(cy)cy.textContent=curYear;
+    renderCfg();renderGuide();renderMyReq(counts);
+    // Nur die sichtbare Ansicht aufbauen; die Jahresuebersicht erst, wenn sie aufgeklappt ist.
+    if(view==="a")renderA(counts);else renderC(counts);
+    if(exportOpen())renderExport();
     document.getElementById("view-a").style.display=view==="a"?"block":"none";
     document.getElementById("view-c").style.display=view==="c"?"block":"none";
     document.getElementById("tab-a").classList.toggle("act",view==="a");
     document.getElementById("tab-c").classList.toggle("act",view==="c");
-    document.getElementById("log").innerHTML=act.length?act.map(function(a){return '<div'+(a.o?' class="ov"':'')+'><span class="t">'+a.t+'</span>  '+a.m+'</div>';}).join(""):'<span class="em">noch keine Aktivität</span>';
+    document.getElementById("log").innerHTML=act.length?act.map(function(a){return '<div'+(a.o?' class="ov"':'')+'><span class="t">'+esc(a.t)+'</span>  '+esc(a.m)+'</div>';}).join(""):'<span class="em">noch keine Aktivität</span>';
     if(detailId!=null)renderDetail();
     renderStatus();
-    selftest();
   }
-  function selftest(){if(!SEED||IS_CONF){var dg=document.getElementById("diag");if(dg)dg.innerHTML='<span class="em">Selbsttest nur im lokalen Modus.</span>';return;}var lines=[];function chk(l,c){lines.push('<div class="'+(c?'pass':'fail')+'">'+(c?'✓':'✗')+' '+l+'</div>');}var s0=SEED;var exp={anika:1,brigitte:2,christiane:1,christine:1,christoph:1,daniel:3,fabienne:2,ines:2,johanna:3,konstantin:2,leo:2};var c26=yearCounts(s0,2026),cOk=Object.keys(exp).every(function(k){return c26[k]===exp[k];});Object.keys(c26).forEach(function(k){if(!(k in exp)&&c26[k]!==0)cOk=false;});chk("Engine: Jahres-Zähler 2026 == Excel (Seed)",cOk);var fx={a:{id:"a",order:0,name:"A"},b:{id:"b",order:1,name:"B"}};var bI=byId;byId=fx;var s1=suggestFor({id:"x1",best:null,kann:["a","b"]},fx,{a:2,b:0});var s2=suggestFor({id:"x2",best:null,kann:["a","b"]},fx,{a:1,b:1});var s2b=suggestFor({id:"x2",best:null,kann:["a","b"]},fx,{a:1,b:1});var dist={a:0,b:0};for(var ii=0;ii<200;ii++){dist[suggestFor({id:"q"+ii,best:null,kann:["a","b"]},fx,{a:1,b:1}).pick]++;}byId=bI;chk("Vorschlag: nur Gleichauf-Minimum",s1.tied.length===1&&s1.pick==="b"&&s2.tied.length===2);chk("Vorschlag stabil je Termin",s2.pick===s2b.pick);chk("Vorschlag fair verteilt (a:"+dist.a+" b:"+dist.b+")",dist.a>40&&dist.b>40);chk("Live: höchstens eine gültige Vertretung",model.requests.every(function(r){return r.best===null||!!byId[r.best];}));var dueLeft=model.requests.filter(function(r){return r.best&&r.date>=todayIso&&!r.remindedAt&&days(todayIso,r.date)<=lead();}).length;chk("Erinnerung: keine fälligen offen (opportunistisch verschickt)",dueLeft===0);var b=JSON.stringify(model);storage.save(model);chk("Live: save()/load()-Roundtrip verlustfrei",b===JSON.stringify(storage.load()));document.getElementById("diag").innerHTML=lines.join("");}
+  
 
   /* ---- Admin: Datenstaende anzeigen + aelteren Stand als NEUE Generation wiederherstellen ---- */
   function showDataStatesCard(){var c=document.getElementById("dscard");if(!c||!IS_CONF||!isAdmin())return;c.style.display="";var b=document.getElementById("dsload");if(b&&!b.__wired){b.__wired=true;b.addEventListener("click",renderDataStates);}}
@@ -641,12 +817,12 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   function restoreDataState(row){
     if(!row||!isAdmin())return;
     if(!confirm("Datenstand Generation "+row.gen+" ("+row.entries+" Eintr\u00e4ge) als neuen aktuellen Stand \u00fcbernehmen?\nSp\u00e4tere \u00c4nderungen sind danach nicht mehr aktuell (bleiben aber als Historie erhalten)."+(_dirty?"\nAchtung: deine noch nicht gespeicherten \u00c4nderungen werden verworfen.":"")))return;
-    if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}_dirty=false;
+    if(_saveTimer){clearTimeout(_saveTimer);_saveTimer=null;}_dirty=false;_outbox=[];
     storage.restore(row).then(function(r){
       if(!r||!r.ok)throw new Error((r&&r.error)||"Wiederherstellung fehlgeschlagen");
       _loadError=null;_saveError=null;
       return reloadModel().then(function(){
-        if(!model)return;log(meName()+" (Admin) stellt Datenstand Generation "+row.gen+" wieder her (neu: "+r.gen+")");
+        if(!model)return;_outbox=[];log(meName()+" (Admin) stellt Datenstand Generation "+row.gen+" wieder her (neu: "+r.gen+")");
         if(typeof start==="function"&&!_started){start();}else{render();}
         renderDataStates();
       });
@@ -661,10 +837,10 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   var _model=model,_cur=cur,_byId=byId,_today=todayIso,_storage=storage,_persist=persist,_tc=__testClock;
   var _confirm=window.confirm,_alert=window.alert; var _ls=null;try{_ls=window.localStorage?window.localStorage.getItem(SKEY):null;}catch(e0){}
   var _su=(typeof shareUsers!=="undefined")?shareUsers:null,_sg=(typeof shareGroup!=="undefined")?shareGroup:null,_pf=(typeof requestActivityPing!=="undefined")?requestActivityPing:null,_sh=(typeof share!=="undefined")?share:null;
-  var _isAdmin=isAdmin;
+  var _isAdmin=isAdmin,_ob=_outbox,_act=act.slice();
   var realBefore=JSON.stringify(_model); var saves=0,sends=0,confirms=0,alerts=0;
   try{
-    __testClock=true;
+    __testClock=true;_outbox=[];
     persist=function(){saves++;};
     storage={name:"test",load:function(){return model;},save:function(){saves++;return Promise.resolve();},reset:function(){return Promise.resolve();}};
     window.confirm=function(){confirms++;return true;}; window.alert=function(){alerts++;};
@@ -892,6 +1068,56 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     var cBase={version:2,config:{reminderLeadDays:3},requests:[]},cLoc={version:2,config:{reminderLeadDays:3,confirmWindowDays:28,criticalDays:7},requests:[]};
     var cM=buildReplay(cBase,cLoc)({version:2,config:{reminderLeadDays:3,fremd:1},requests:[{id:"z",kann:[],best:null}]});
     A("Integration","Replay uebernimmt Regel-Aenderung, bewahrt Fremdes",cM.config.confirmWindowDays===28&&cM.config.criticalDays===7&&cM.config.fremd===1&&cM.requests.length===1);
+    // ---- Semantisches Replay (veralteter Tab ueberschreibt nichts Fremdes) ----
+    var sB={version:2,config:{},requests:[{id:"k",kann:["u1"],passed:[],best:null,bestAt:null,remindedAt:null,confirmNotifiedAt:null}]};
+    function sV(fn){var x=JSON.parse(JSON.stringify(sB));if(fn)fn(x.requests[0],x);return x;}
+    var q1=buildReplay(sB,sV(function(r){r.kann.push("me");}))(sV(function(r){r.kann.push("other");}));
+    A("Integration","Replay kann: eigener und fremder Eintrag bleiben beide",q1.requests[0].kann.join()==="u1,other,me");
+    var q2=buildReplay(sB,sV(function(r){r.kann=[];}))(sV(function(r){r.kann.push("other");}));
+    A("Integration","Replay kann: eigenes Entfernen laesst fremden Eintrag stehen",q2.requests[0].kann.join()==="other");
+    function zus(r){r.best="me";r.bestAt=FT;r.confirmNotifiedAt=FT;r.kann.push("me");}
+    var rp3=buildReplay(sB,sV(zus)),q3=rp3(sV(function(r){r.best="other";r.bestAt=dd(-1);})).requests[0];
+    A("Integration","Replay Zusage: fremde Zusage bleibt, Konflikt gemeldet",q3.best==="other"&&q3.bestAt===dd(-1)&&!q3.confirmNotifiedAt&&q3.kann.indexOf("me")>=0&&rp3.conflicts.length===1&&rp3.conflicts[0].k==="best");
+    var rp4=buildReplay(sB,sV(zus)),q4=rp4(sV(function(r){r.kann.push("other");})).requests[0];
+    A("Integration","Replay Zusage: ohne fremde Aenderung uebernommen",q4.best==="me"&&q4.bestAt===FT&&q4.confirmNotifiedAt===FT&&rp4.conflicts.length===0);
+    var rp5=buildReplay(sB,{version:2,config:{},requests:[]}),q5=rp5(sV(function(r){r.best="other";}));
+    A("Integration","Replay Loeschen: inzwischen zugesagter Dienst bleibt",q5.requests.length===1&&rp5.conflicts.length===1&&rp5.conflicts[0].k==="remove");
+    A("Integration","Replay Loeschen: unveraenderter Dienst wird geloescht",buildReplay(sB,{version:2,config:{},requests:[]})(sV()).requests.length===0);
+    var rp6=buildReplay(sB,sV(function(r){r.remindedAt=FT;})),q6=rp6(sV(function(r){r.remindedAt=FT;}));
+    A("Integration","Replay Zeitstempel: zweiter Client verliert den Anspruch",rp6.conflicts.some(function(c){return c.k==="remindedAt";})&&q6.requests[0].remindedAt===FT);
+    var rp7=buildReplay(sB,sV(function(r){r.dienstVon="Neu";})),q7=rp7(sV(function(r){r.best="other";})).requests[0];
+    A("Integration","Replay: uebrige Felder weiterhin feldweise",q7.dienstVon==="Neu"&&q7.best==="other"&&rp7.conflicts.length===0);
+    // ---- Postausgang: Mails erst nach dem Speichern, nie bei verlorenem Anspruch ----
+    (function(){
+      _outbox=[];var rO=mk("r_ob",dd(10),{dvu:"t2",dv:"Test B"});model.requests.push(rO);var s1=sends;uebernehmen("r_ob");
+      A("Integration","Zusage: Mail wird vorgemerkt, nicht sofort verschickt",sends===s1&&_outbox.length===1&&rO.best==="t1"&&rO.confirmNotifiedAt===FT);
+      flushOutbox(takeOutbox(),[{id:"r_ob",k:"best"}]);
+      A("Integration","Zusage im Konflikt verloren: keine Mail",sends===s1&&_outbox.length===0);
+      rO.confirmNotifiedAt=null;notifyConfirm(rO);flushOutbox(takeOutbox(),[]);
+      A("Integration","nach erfolgreichem Speichern: Mail verschickt",IS_CONF?sends===s1+1:sends===s1);
+      rO.confirmNotifiedAt=null;notifyConfirm(rO);rO.best="t2";flushOutbox(takeOutbox(),[]);
+      A("Integration","Vertretung inzwischen geaendert: keine Mail",sends===(IS_CONF?s1+1:s1));
+      var rP=mk("r_pl",dd(10),{});model.requests.push(rP);pool("r_pl");var a1=alerts;pool("r_pl");
+      A("Integration","Pool erinnern: hoechstens einmal pro Tag und Termin",rP.poolRemindedAt===FT&&alerts===a1+1&&_outbox.length===1);
+      _outbox=[];
+      // ausgeschiedene Vertretung (nicht mehr in der Gruppe)
+      var rD=mk("r_dep",dd(2),{best:"weg",kann:["weg"],bestAt:FT});model.requests.push(rD);var th=false,html="";
+      try{runDueReminders();html=rowHtml(rD,counts)+detailHtml(rD)+inboxCard(rD,"kritisch",counts);}catch(ex){th=true;}
+      A("Integration","Ausgeschiedene Vertretung: keine Ausnahme, keine Erinnerung",!th&&!rD.remindedAt&&_outbox.length===0&&html.indexOf("nicht mehr im Pool")>=0);
+      var c1=confirms;uebernehmen("r_dep");
+      A("Integration","Ausgeschiedene Vertretung laesst sich ersetzen",confirms===c1+1&&rD.best==="t1");
+      _outbox=[];
+      // Escaping
+      var bad='<img src=x onerror=1>',rX=mk("r_x",dd(30),{dv:bad,dvu:"t1",kann:[bad],best:null});rX.id='x"><b>';
+      var hx=rowHtml(rX,counts)+inboxCard(rX,"kann",counts)+myReqCard(rX,counts)+detailHtml(rX);
+      A("Integration","Escaping: Namen/IDs aus den Daten werden nie als HTML ausgegeben",hx.indexOf("<img")<0&&hx.indexOf('"><b>')<0&&esc('"\'<')==="&quot;&#39;&lt;");
+      // Dubletten + IDs
+      var gd=document.getElementById("g-date"),gn=document.getElementById("g-name"),gc=document.getElementById("gcard"),_d=gd.value,_n=gn.value,_g=gc.style.display;
+      var nA=model.requests.length;gd.value=dd(33);gn.value="Doppel Test";anlegen();gd.value=dd(33);gn.value="doppel test";anlegen();
+      A("Integration","Gesuch anlegen: gleiche Person + gleicher Tag nur einmal",model.requests.length===nA+1);
+      A("Integration","neue IDs sind eindeutig",newId()!==newId());
+      gd.value=_d;gn.value=_n;gc.style.display=_g;document.getElementById("g-hint").textContent="";_outbox=[];
+    })();
     // ---- Activity-Marker (Sprint 2b, reine Funktion nextBody) ----
     var mb0="<p>Plan</p>";
     var mb1=nextBody(mb0);
@@ -904,7 +1130,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
     A("Integration","Marker auch nach Body-Normalisierung ersetzt",(mb3.match(/wp-feed-\d+/g)||[]).length===1&&/wp-feed-2<\/ac:parameter>/.test(mb3));
   }catch(e){ R.push({g:"Sicherheit",n:"Testlauf-Ausnahme: "+(e&&e.message?e.message:e),ok:false}); }
   finally{
-    persist=_persist; storage=_storage; model=_model; cur=_cur; byId=_byId; todayIso=_today; isAdmin=_isAdmin; __testClock=_tc;
+    _outbox=_ob; act=_act; persist=_persist; storage=_storage; model=_model; cur=_cur; byId=_byId; todayIso=_today; isAdmin=_isAdmin; __testClock=_tc;
     window.confirm=_confirm; window.alert=_alert;
     if(_su){shareUsers=_su;} if(_sg){shareGroup=_sg;} if(_pf){requestActivityPing=_pf;} if(_sh){share=_sh;} try{if(window.localStorage){if(_ls===null){window.localStorage.removeItem(SKEY);}else{window.localStorage.setItem(SKEY,_ls);}}}catch(e4){}
   }
@@ -916,17 +1142,24 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   html='<div style="font-weight:700;color:'+(allok?"#216e4e":"#ae2a19")+'">'+(allok?"Alle Tests gruen":"Rote Tests vorhanden")+'</div>'+html;
   out.innerHTML=html;
 }
-  function boot(){try{injectStyle();buildShell();}catch(e){showError(e);return;}if(IS_CONF){loadConfluence().then(function(idr){__members=idr.members;cur=idr.cur;curName=idr.curName;byId={};__members.forEach(function(m){byId[m.id]=m;});storage=PropertyStore();return storage.load().then(null,function(e){_loadError=e;throw e;});}).then(function(data){
-      // Daten vorhanden (neues Format, Altformat wpstore v2 oder Alt-Anhang): NICHT beim Laden speichern;
-      // Migration ins neue Format passiert beim ersten echten Speichern (Versionsstempel inklusive).
-      if(data){if(!data.members||!data.members.length)data.members=__members;upgradeData(data);return data;}
-      // Nur wenn sicher KEINE Daten existieren (kein Manifest, kein Alt-Anhang): Erst-Import aus seed.json.
-      // save() ueberschreibt dabei nie Daten, die ein anderer Tab inzwischen angelegt hat.
-      return getSeed().then(function(sd){SEED=sd;var m=remapSeed(sd,__members);if(__importDiag){showInfo(__importDiag);}return storage.save(m);});
-    }).then(function(data){model=data;model.members=__members;byId={};__members.forEach(function(m){byId[m.id]=m;});start();}).catch(function(e){
-      if(window.console)console.error("[WP] Ladefehler",e);
-      if(storage&&byId[cur]){_loadError=_loadError||e;renderStatus();showDataStatesCard();}else{showError(e);}
-    });}else{getSeed().then(function(sd){SEED=sd;storage=makeStorage(sd);var data=storage.load();model=data;byId={};model.members.forEach(function(m){byId[m.id]=m;});cur=getLS(UKEY,null);if(!cur||!byId[cur])cur=model.members.slice().sort(function(a,b){return a.order-b.order;})[0].id;start();}).catch(showError);}}var _started=false;function start(){_started=true;document.body.addEventListener("click",function(ev){var cl=ev.target.closest("[data-modal-close]");if(cl){closeDetail();return;}var b=ev.target.closest("button[data-act]");if(b&&isReadOnly()){onSaveErr(new Error("Schreibgesch\u00fctzt \u2013 \u00c4nderungen sind gerade nicht m\u00f6glich."));return;}if(b&&isGuest())return;if(b){var id=b.getAttribute("data-id"),a=b.getAttribute("data-act");if(a==="adm-head"){admHead(id);return;}if(a==="adm-kann"){admKann(id,b.getAttribute("data-uid"));return;}if(a==="adm-best"){admBest(id);return;}var fn=({kann:toggleKann,ueb:uebernehmen,frei:freigeben,remind:remind,pool:pool,del:loeschen,pass:pass})[a];if(fn)fn(id);return;}var dc=ev.target.closest("[data-detail]");if(dc){openDetail(dc.getAttribute("data-detail"));return;}});document.addEventListener("keydown",function(ev){if((ev.key==="Escape"||ev.keyCode===27)&&detailId!=null)closeDetail();});
+  function boot(){
+    try{injectStyle();buildShell();}catch(e){showError(e);return;}
+    if(IS_CONF){
+      loadConfluence().then(function(idr){__members=idr.members;cur=idr.cur;curName=idr.curName;byId={};__members.forEach(function(m){byId[m.id]=m;});storage=PropertyStore();return storage.load().then(null,function(e){_loadError=e;throw e;});}).then(function(data){
+        // Daten vorhanden (neues Format, Altformat wpstore v2 oder Alt-Anhang): NICHT beim Laden speichern;
+        // Migration ins neue Format passiert beim ersten echten Speichern (Versionsstempel inklusive).
+        if(data){upgradeData(data);return data;}
+        // Nur wenn sicher KEINE Daten existieren (kein Manifest, kein Alt-Anhang): Erst-Import aus seed.json.
+        // save() ueberschreibt dabei nie Daten, die ein anderer Tab inzwischen angelegt hat.
+        return getSeed().then(function(sd){var m=remapSeed(sd,__members);if(__importDiag){showInfo(__importDiag);}return storage.save(m);});
+      }).then(function(data){data.members=__members;setModel(data);start();}).catch(function(e){
+        if(window.console)console.error("[WP] Ladefehler",e);
+        if(storage&&byId[cur]){_loadError=_loadError||e;renderStatus();showDataStatesCard();}else{showError(e);}
+      });
+    }else{
+      getSeed().then(function(sd){storage=makeStorage(sd);setModel(storage.load());cur=getLS(UKEY,null);if(!cur||!byId[cur])cur=membersSorted()[0].id;start();}).catch(showError);
+    }
+  }var _started=false;function start(){_started=true;document.body.addEventListener("click",function(ev){var cl=ev.target.closest("[data-modal-close]");if(cl){closeDetail();return;}var b=ev.target.closest("button[data-act]");if(b&&isReadOnly()){onSaveErr(new Error("Schreibgesch\u00fctzt \u2013 \u00c4nderungen sind gerade nicht m\u00f6glich."));return;}if(b&&isGuest())return;if(b){var id=b.getAttribute("data-id"),a=b.getAttribute("data-act");if(a==="adm-head"){admHead(id);return;}if(a==="adm-kann"){admKann(id,b.getAttribute("data-uid"));return;}if(a==="adm-best"){admBest(id);return;}var fn=({kann:toggleKann,ueb:uebernehmen,frei:freigeben,remind:remind,pool:pool,del:loeschen,pass:pass})[a];if(fn)fn(id);return;}var dc=ev.target.closest("[data-detail]");if(dc){openDetail(dc.getAttribute("data-detail"));return;}});document.addEventListener("keydown",function(ev){if((ev.key==="Escape"||ev.keyCode===27)&&detailId!=null)closeDetail();});
   document.getElementById("who").addEventListener("change",function(e){cur=e.target.value;setLS(UKEY,cur);render();});
   document.getElementById("tab-a").addEventListener("click",function(){view="a";setLS(VKEY,view);render();});
   document.getElementById("tab-c").addEventListener("click",function(){view="c";setLS(VKEY,view);render();});
@@ -935,7 +1168,7 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   // offenen Aenderungen den Browser-Hinweis "Seite verlassen?" ausloesen.
   window.addEventListener("beforeunload",function(ev){flushActivityNow();if(hasUnsaved()){flushPendingAsync();ev.preventDefault();ev.returnValue="";return "";}});
   document.addEventListener("visibilitychange",function(){if(document.visibilityState==="hidden"){flushPendingAsync();flushActivityNow();}else if(refreshToday()){if(!isReadOnly())runDueReminders();render();}});
-  var __dsl=document.getElementById("dsload");if(__dsl&&!__dsl.__wired){__dsl.__wired=true;__dsl.addEventListener("click",renderDataStates);}var __ey=document.getElementById("exp-year");if(__ey)__ey.addEventListener("change",function(){expYear=parseInt(this.value,10);renderExport();});var __ec=document.getElementById("exp-csv");if(__ec)__ec.addEventListener("click",function(){downloadCsv(expYear);});
+  var __dsl=document.getElementById("dsload");if(__dsl&&!__dsl.__wired){__dsl.__wired=true;__dsl.addEventListener("click",renderDataStates);}var __ey=document.getElementById("exp-year");if(__ey)__ey.addEventListener("change",function(){expYear=parseInt(this.value,10);renderExport();});var __ed=document.getElementById("exp-details");if(__ed)__ed.addEventListener("toggle",function(){if(this.open)renderExport();});var __ec=document.getElementById("exp-csv");if(__ec)__ec.addEventListener("click",function(){downloadCsv(expYear);});
   document.getElementById("savebtn").addEventListener("click",anlegen);
   document.getElementById("resetbtn").addEventListener("click",resetAll);
   var __cs=document.getElementById("cfg-save");if(__cs)__cs.addEventListener("click",saveCfg);
@@ -943,16 +1176,15 @@ function loadConfluence(){return Promise.all([jget("/rest/api/user/current"),jge
   document.getElementById("cleanbtn").addEventListener("click",aufraeumen);
   var __stb=document.getElementById("selftestbtn");if(__stb)__stb.addEventListener("click",selftest2);
   document.getElementById("g-date").addEventListener("change",function(e){var v=e.target.value,h=document.getElementById("g-hint");if(!v){h.textContent="";return;}var hn=holiday(v);h.innerHTML=weekday(v)+", "+fmt(v)+(hn?" · "+hn:"")+(isWeekendOrHoliday(v)?"":' · <span style="color:var(--amber)">Hinweis: kein Sa/So/Feiertag</span>')+((v<todayIso)?' · <span style="color:var(--info)">rückwirkender Eintrag</span>':"");});
-  var names={};model.members.forEach(function(m){names[m.name]=1;});model.requests.forEach(function(r){if(r.dienstVon)names[r.dienstVon]=1;});
-  document.getElementById("names").innerHTML=Object.keys(names).sort().map(function(n){return '<option value="'+n+'">';}).join("");
-  var __gb=document.getElementById("g-best");if(__gb)__gb.innerHTML='<option value="">— niemand (offen) —</option>'+model.members.slice().sort(function(a,b){return a.order-b.order;}).map(function(m){return '<option value="'+m.id+'">'+esc(m.name)+'</option>';}).join("");
+  fillNames();
+  var __gb=document.getElementById("g-best");if(__gb)__gb.innerHTML='<option value="">— niemand (offen) —</option>'+membersSorted().map(function(m){return '<option value="'+esc(m.id)+'">'+esc(m.name)+'</option>';}).join("");
   
   
   document.getElementById("cy").textContent=curYear;
   document.getElementById("tline").textContent="↑ ab heute   ·   darunter vergangene Termine";
   if(!isReadOnly())runDueReminders();
   render();
-  if(IS_CONF){wireUserSearch();startPolling();}
+  if(IS_CONF){wireUserSearch();startPolling();if(!isGuest()&&getLS(bumpKey(),"")==="1")requestActivityPing();}
 }
 boot();
 }());

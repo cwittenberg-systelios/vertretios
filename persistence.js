@@ -316,7 +316,7 @@
       self.replayQueue = []; self.readOnly = false; self.lastError = null;
       self.recovered = r.recovered || null;
       if (self.recovered) self.readOnly = true;           // bis Admin bewusst wiederherstellt
-      else { self.gc(); self.guardPromise = self.ensureGuard(); }   // best effort, nicht awaited
+      else { self.gc(); self._guardChecked = false; self.guardPromise = self._runGuard(); }   // best effort, nicht awaited
       return self.model;
     }).catch(function (e) {
       self.model = null; self.readOnly = true; self.lastError = e;
@@ -373,6 +373,14 @@
     }).catch(function () { return false; });
   };
 
+  Store.prototype._runGuard = function () {
+    var self = this;
+    return this.ensureGuard().then(function (r) {
+      if (self.layout === "new" && self.manifestKey && self.manifestKey !== LEGACY) self._guardChecked = true;
+      return r;
+    });
+  };
+
   // Alte Chunk-Sätze (gen ≤ aktuell − KEEP) entfernen; neuere und Platzhalter nie.
   Store.prototype.gc = function () {
     var self = this, t = this.t;
@@ -387,7 +395,6 @@
     }).catch(function () { return 0; });
   };
 
-  // Copy-on-Write mit Generations-Check. -> {conflict:false, gen, …} | {conflict:true}
   // Copy-on-Write mit Generations-Check. -> {conflict:false, gen, …} | {conflict:true}
   // Migration (maßgebliches Manifest ist noch wpstore): der Commit ist der CAS auf wpstore selbst
   // (ein gleichzeitiger alter Tab bekommt 409 bzw. wir), danach wird vertretios.manifest angelegt.
@@ -521,7 +528,9 @@
         if (res.manifestKey) self.manifestKey = res.manifestKey;
         if (res.manifestVersion !== undefined) self.manifestVersion = res.manifestVersion;
         self.replayQueue = []; self.recovered = null;
-        self.guardPromise = self.ensureGuard();
+        // Platzhalter nur prüfen, bis er in dieser Sitzung einmal gegen das neue Manifest gelaufen ist
+        // (spart 2 Requests je Speichern; load() prüft ohnehin bei jedem Seitenaufruf).
+        if (!self._guardChecked) self.guardPromise = self._runGuard();
         return { ok: true, gen: res.gen, migratedTo: res.migratedTo };
       }
       if (retries <= 0) return { ok: false, error: "Dauerkonflikt – andere speichern gerade gleichzeitig. Bitte erneut versuchen." };
@@ -554,7 +563,7 @@
 
   /* ---------- Confluence-REST-Transport (Content Properties) ----------
    * Port von urlaubios/app.js ConfluenceTransport. fetchFn injizierbar (Tests).
-   * put: neu -> POST (CAS „darf nicht existieren" bei expectedVersion 0), sonst PUT version+1.
+   * put: expectedVersion 0 -> direkt POST (CAS: darf nicht existieren, kein GET davor), sonst GET + PUT version+1.
    * Fehlertext wird ausgewertet: /another space/i -> err.spaceMismatch (Seite verschoben). */
   function ConfluenceTransport(pageId, ctx, fetchFn) {
     this.base = (ctx || "") + "/rest/api/content/" + pageId + "/property";
@@ -594,16 +603,22 @@
       }
       return r.json().then(function (j) { return { version: (j.version && j.version.number) || 1 }; }, function () { return { version: undefined }; });
     }
+    function create() {
+      return self._req("POST", self.base, { key: key, value: value }).then(function (r) {
+        if (r.status === 400 && expectedVersion === 0) {
+          // Confluence meldet „existiert schon" teils mit 400 -> nachsehen, ob jetzt vorhanden
+          return self.get(key).then(function (now) { if (now) conflict(); return check(r); });
+        }
+        return check(r);
+      }, netError("POST " + key));
+    }
+    // „darf nicht existieren" (neue Chunks, neues Manifest): direkt anlegen, ohne vorher zu lesen –
+    // existiert der Schlüssel doch, antwortet Confluence mit 409/400 (= Konflikt).
+    if (expectedVersion === 0) return create();
     return this.get(key).then(function (cur) {
       if (!cur) {
-        if (expectedVersion !== undefined && expectedVersion !== 0) conflict();
-        return self._req("POST", self.base, { key: key, value: value }).then(function (r) {
-          if (r.status === 400 && expectedVersion === 0) {
-            // Confluence meldet „existiert schon" teils mit 400 -> nachsehen, ob jetzt vorhanden
-            return self.get(key).then(function (now) { if (now) conflict(); return check(r); });
-          }
-          return check(r);
-        }, netError("POST " + key));
+        if (expectedVersion !== undefined) conflict();
+        return create();
       }
       if (expectedVersion !== undefined && expectedVersion !== cur.version) conflict();
       return self._req("PUT", self.base + "/" + encodeURIComponent(key), { key: key, value: value, version: { number: cur.version + 1 } }).then(check, netError("PUT " + key));

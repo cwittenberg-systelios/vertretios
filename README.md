@@ -34,11 +34,22 @@ NODE_PATH=/opt/npm-tools/node_modules node test/e2e.browser.js
 Das Verhalten im Einzelnen:
 
 - **Laden:** Fehlt ein Chunk, wird das Manifest bis zu dreimal neu gelesen. Danach fällt die App auf den neuesten lesbaren älteren Stand zurück; dieser ist nur sichtbar und schreibgeschützt. Kaputtes JSON und Lesefehler sind Ladefehler: Es erscheint ein rotes Banner und die App ist schreibgeschützt. „Keine Daten“ gilt nur, wenn kein Manifest existiert oder `count = 0` gemeldet wird.
-- **Speichern:** Copy-on-Write mit Manifest-CAS. Bei 409 werden die Daten gemergt (id-basiertes Delta) und das Speichern höchstens zweimal wiederholt. Bei 5xx oder Netzfehler liest die App das Manifest nach und löscht eigene Chunks nur, wenn sicher ist, dass das Manifest nicht auf sie zeigt. Speicherfehler erscheinen als rotes Banner mit „Erneut versuchen“.
+- **Speichern:** Copy-on-Write mit Manifest-CAS. Bei 409 werden die Daten gemergt (id-basiertes, semantisches Delta, s. unten) und das Speichern höchstens zweimal wiederholt. Bei 5xx oder Netzfehler liest die App das Manifest nach und löscht eigene Chunks nur, wenn sicher ist, dass das Manifest nicht auf sie zeigt. Speicherfehler erscheinen als rotes Banner mit „Erneut versuchen“.
 - **Schließen/Verstecken des Tabs:** Es gibt keinen synchronen Speicherpfad mehr. Die App stößt nur den normalen asynchronen Speichervorgang an und fragt bei offenen Änderungen „Seite verlassen?“. Beim Entladen wird nie etwas gelöscht.
 - **Historie:** Die letzten 10 Generationen bleiben erhalten. Aufgeräumt wird nur beim Laden, und nur Generationen ≤ aktuell − 10.
 - **Admin „Datenstände“:** Karte unten auf der Seite, sichtbar für `WP_ADMINS`. Sie listet alle Generationen (Format, Einträge, lesbar ja/nein) und stellt einen älteren Stand als **neue** Generation wieder her.
 - **Build-Version:** steht im Seitenfuß (`Build … · Datenstand Generation …`) und in der Konsole (`[WP] Vertretungspool Build …`).
+
+## Gleichzeitige Nutzung, Rechte, Benachrichtigungen
+
+- **Veraltete Tabs:** Eigene Änderungen werden semantisch auf den frischen Stand gelegt. „kann“/„weitergegeben“ sind Mengen-Deltas (fremde Einträge bleiben). Eine Zusage, Freigabe oder Löschung gilt nur, wenn die Vertretung seit dem eigenen Stand niemand sonst geändert hat; andernfalls bleibt der fremde Stand und es erscheint ein gelber, schließbarer Hinweis.
+- **Aktualisierung:** Alle 60 s und bei Tab-Fokus wird die Generation geprüft. Ist nichts offen (keine ungespeicherte Änderung, kein Dialog, kein Formular), lädt die App selbst nach; sonst erscheint das Banner „Jetzt aktualisieren“.
+- **Nicht-Mitglieder** (nicht in der Gruppe, kein Admin) sehen die Liste nur an. Admins ohne Gruppenmitgliedschaft können verwalten, sich aber nicht selbst eintragen.
+- **Mails (Teilen-API)** gehen erst nach erfolgreichem Speichern raus. Der Zeitstempel im Datensatz ist der Anspruch: Speichern zwei Tabs gleichzeitig, verschickt nur der Gewinner. Schlägt der Versand fehl, wird der Zeitstempel zurückgenommen (fällige Erinnerungen werden beim nächsten Laden erneut versucht). „Pool erinnern“ geht je Termin höchstens einmal pro Tag.
+- **Ausgeschiedene Mitglieder:** Einträge von Personen, die nicht mehr in der Gruppe sind, bleiben sichtbar („nicht mehr im Pool“); eine solche Zusage lässt sich ersetzen, Erinnerungen an sie entfallen.
+- **Ausgabe:** Alle Werte aus den Daten (Namen, Freitext „Dienst von“, IDs) werden escaped ausgegeben.
+- **Feed-Eintrag:** Der Seiten-Bump läuft nur asynchron (kein synchrones XHR). Ein beim Schließen abgebrochener Bump wird beim nächsten Seitenaufruf desselben Nutzers nachgeholt.
+- **Mitglieder** werden nicht mehr mitgespeichert; sie kommen bei jedem Laden aus der Confluence-Gruppe.
 
 ## Deploy-Reihenfolge (wichtig, Live-Daten!)
 
