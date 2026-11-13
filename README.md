@@ -55,3 +55,9 @@ Rückweg: Den Anhang `app.js` und das Makro auf die Vorversion zurückzusetzen i
 ## Admins
 
 `window.WP_ADMINS` im HTML-Makro: Confluence-Benutzernamen oder userKeys.
+
+Admins sehen außerdem die Karte **„Regeln (Admin)“**: Zusagefenster (Standard 21 Tage), „kritisch ab“ (Standard 7 Tage) und Erinnerungsvorlauf (Standard 3 Tage). Die Werte stehen in `model.config` und erscheinen auch in der Anleitung.
+
+## Sortierung der Kürzel
+
+In der Liste, im Detail-Dialog und unter „Meine Gesuche“ stehen die Beworbenen in derselben Reihenfolge: wenigste Dienste im laufenden Jahr zuerst; bei Gleichstand der Vorschlag, dann der Name; „weitergegeben“ ans Ende. Bei zugesagten Diensten steht die Vertretung vorn. Das linke Kürzel liegt beim Überlappen oben, der Tooltip zeigt die Dienstzahl.
